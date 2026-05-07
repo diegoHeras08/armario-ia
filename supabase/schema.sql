@@ -4,6 +4,7 @@
 -- En esta primera fase no se aplican politicas RLS ni se vinculan
 -- tablas con auth.users; ese trabajo se realizara mas adelante,
 -- cuando se introduzca la autenticacion real.
+create extension if not exists "pgcrypto";
 
 -- =========================================================
 -- Tabla: usuarios
