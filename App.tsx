@@ -32,7 +32,7 @@ const ETIQUETAS_NAVEGACION: Record<NombrePantalla, string> = {
   tryOn: 'Try-on',
   historial: 'Historial',
 };
-
+//prueba commit
 const PANTALLAS_NAVEGABLES: NombrePantalla[] = [
   'dashboard',
   'armario',
