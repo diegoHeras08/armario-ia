@@ -14,7 +14,7 @@ function generarIdPrenda(): string {
 }
 
 // Construye una prenda completa a partir de la entrada del formulario.
-// En esta fase sigue siendo util para el modo local/mock.
+// Sigue siendo util para pruebas locales si Supabase no se usa.
 export function construirPrenda(entrada: NuevaPrendaEntrada): Prenda {
   return {
     id: generarIdPrenda(),
@@ -54,13 +54,20 @@ type PrendaFilaSupabase = {
   descripcion: string | null;
   color_principal: string | null;
   fecha_alta: string;
-  categorias: CategoriaRelacion;
+  categorias?: CategoriaRelacion;
+};
+
+type UsuarioMvpFila = {
+  id_usuario: string;
+};
+
+type CategoriaFila = {
+  id_categoria: string;
 };
 
 // Obtiene la categoria desde la relacion devuelta por Supabase.
-// Se contempla tanto objeto como array para evitar errores de tipado.
 function obtenerCategoriaDesdeRelacion(
-  categoriaRelacion: CategoriaRelacion
+  categoriaRelacion: CategoriaRelacion | undefined
 ): CategoriaPrenda {
   if (Array.isArray(categoriaRelacion)) {
     return categoriaRelacion[0]?.nombre ?? 'otro';
@@ -121,6 +128,123 @@ export async function obtenerPrendasDesdeSupabase(): Promise<{
 
   return {
     prendas: filas.map(mapearPrendaDesdeSupabase),
+    error: null,
+  };
+}
+
+// Crea una prenda real en Supabase.
+// Usa el Usuario MVP temporal y la categoria seleccionada.
+// Mas adelante se sustituira por autenticacion real y auth.uid().
+export async function crearPrendaEnSupabase(
+  entrada: NuevaPrendaEntrada
+): Promise<{
+  prenda: Prenda | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      prenda: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const mensajeError = validarNuevaPrenda(entrada);
+
+  if (mensajeError) {
+    return {
+      prenda: null,
+      error: mensajeError,
+    };
+  }
+
+  const { data: usuario, error: errorUsuario } = await supabase
+    .from('usuarios')
+    .select('id_usuario')
+    .eq('nombre_perfil', 'Usuario MVP')
+    .limit(1)
+    .maybeSingle();
+
+  if (errorUsuario) {
+    return {
+      prenda: null,
+      error: `Error al consultar el Usuario MVP: ${errorUsuario.message}`,
+    };
+  }
+
+  if (!usuario) {
+    return {
+      prenda: null,
+      error:
+        'No se ha encontrado el Usuario MVP en Supabase. Crea primero el usuario temporal.',
+    };
+  }
+
+  const { data: categoria, error: errorCategoria } = await supabase
+    .from('categorias')
+    .select('id_categoria')
+    .eq('nombre', entrada.categoria)
+    .limit(1)
+    .maybeSingle();
+
+  if (errorCategoria) {
+    return {
+      prenda: null,
+      error: `Error al consultar la categoría: ${errorCategoria.message}`,
+    };
+  }
+
+  if (!categoria) {
+    return {
+      prenda: null,
+      error: `No se ha encontrado la categoría "${entrada.categoria}" en Supabase.`,
+    };
+  }
+
+  const usuarioMvp = usuario as UsuarioMvpFila;
+  const categoriaSeleccionada = categoria as CategoriaFila;
+
+  const { data: prendaInsertada, error: errorInsert } = await supabase
+    .from('prendas')
+    .insert({
+      id_usuario: usuarioMvp.id_usuario,
+      id_categoria: categoriaSeleccionada.id_categoria,
+      nombre: entrada.nombre.trim(),
+      descripcion: entrada.notas.trim(),
+      color_principal: entrada.color.trim(),
+      temporada: null,
+    })
+    .select(
+      `
+      id_prenda,
+      nombre,
+      descripcion,
+      color_principal,
+      fecha_alta,
+      categorias (
+        nombre
+      )
+    `
+    )
+    .single();
+
+  if (errorInsert) {
+    return {
+      prenda: null,
+      error: `No se ha podido insertar la prenda en Supabase: ${errorInsert.message}`,
+    };
+  }
+
+  if (!prendaInsertada) {
+    return {
+      prenda: null,
+      error: 'Supabase no ha devuelto la prenda insertada.',
+    };
+  }
+
+  return {
+    prenda: mapearPrendaDesdeSupabase(
+      prendaInsertada as unknown as PrendaFilaSupabase
+    ),
     error: null,
   };
 }

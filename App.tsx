@@ -125,13 +125,12 @@ export default function App() {
   // Anade una nueva prenda al estado local del armario.
   // En la siguiente fase se conectara tambien con Supabase.
   function anadirPrenda(prenda: Prenda) {
-    setPrendas((prev) => [prenda, ...prev]);
+  setPrendas((prev) => [prenda, ...prev]);
 
-    // En esta fase la prenda creada desde la app se guarda solo en memoria local.
-    // La escritura real en Supabase se implementara despues.
-    setOrigenPrendas('mock');
-    setErrorCargaPrendas(null);
-  }
+  // En esta fase la prenda ya se ha guardado en Supabase desde AltaPrendaPantalla.
+  setOrigenPrendas('supabase');
+  setErrorCargaPrendas(null);
+}
 
   function renderizarPantalla() {
     switch (pantallaActual) {

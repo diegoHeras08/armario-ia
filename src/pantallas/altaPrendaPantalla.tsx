@@ -18,7 +18,7 @@ import {
   Prenda,
 } from '../tipos/prenda';
 import {
-  construirPrenda,
+  crearPrendaEnSupabase,
   validarNuevaPrenda,
 } from '../servicios/prendaServicio';
 import { NombrePantalla } from '../tipos/navegacion';
@@ -37,17 +37,41 @@ export function AltaPrendaPantalla({
   const [color, setColor] = useState('');
   const [notas, setNotas] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [guardando, setGuardando] = useState(false);
 
-  const guardar = () => {
+  const guardar = async () => {
+    if (guardando) {
+      return;
+    }
+
     const entrada: NuevaPrendaEntrada = { nombre, categoria, color, notas };
+
     const mensajeError = validarNuevaPrenda(entrada);
+
     if (mensajeError) {
       setError(mensajeError);
       return;
     }
-    const prenda = construirPrenda(entrada);
-    onPrendaCreada(prenda);
-    Alert.alert('Prenda añadida', `"${prenda.nombre}" se ha guardado.`);
+
+    setGuardando(true);
+    setError(null);
+
+    const resultado = await crearPrendaEnSupabase(entrada);
+
+    setGuardando(false);
+
+    if (resultado.error || !resultado.prenda) {
+      setError(`No se pudo guardar en Supabase: ${resultado.error}`);
+      return;
+    }
+
+    onPrendaCreada(resultado.prenda);
+
+    Alert.alert(
+      'Prenda añadida',
+      `"${resultado.prenda.nombre}" se ha guardado en Supabase.`
+    );
+
     setNombre('');
     setColor('');
     setNotas('');
@@ -119,7 +143,10 @@ export function AltaPrendaPantalla({
         {error && <Text style={estilos.error}>{error}</Text>}
 
         <View style={estilos.separador} />
-        <BotonPrincipal texto="Guardar prenda" onPress={guardar} />
+        <BotonPrincipal
+          texto={guardando ? 'Guardando...' : 'Guardar prenda'}
+          onPress={guardar}
+        />
         <View style={estilos.separador} />
         <BotonPrincipal
           texto="Cancelar"
