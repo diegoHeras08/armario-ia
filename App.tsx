@@ -127,7 +127,7 @@ export default function App() {
   function anadirPrenda(prenda: Prenda) {
   setPrendas((prev) => [prenda, ...prev]);
 
-  // En esta fase la prenda ya se ha guardado en Supabase desde AltaPrendaPantalla.
+  // La prenda ya se ha guardado en Supabase desde AltaPrendaPantalla.
   setOrigenPrendas('supabase');
   setErrorCargaPrendas(null);
 }

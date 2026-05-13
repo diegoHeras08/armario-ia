@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
   Alert,
+  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,6 +9,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+
 import { BotonPrincipal } from '../componentes/BotonPrincipal';
 import { EncabezadoPantalla } from '../componentes/EncabezadoPantalla';
 import {
@@ -36,8 +39,69 @@ export function AltaPrendaPantalla({
   const [categoria, setCategoria] = useState<CategoriaPrenda>('superior');
   const [color, setColor] = useState('');
   const [notas, setNotas] = useState('');
+
+  const [imagenUri, setImagenUri] = useState<string | null>(null);
+  const [imagenBase64, setImagenBase64] = useState<string | null>(null);
+  const [imagenMimeType, setImagenMimeType] = useState<string | null>(null);
+
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
+
+  async function seleccionarImagen() {
+    const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permiso.granted) {
+      setError('Necesitas conceder permiso para acceder a la galería.');
+      return;
+    }
+
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [4, 5],
+      base64: true,
+    });
+
+    if (resultado.canceled) {
+      return;
+    }
+
+    const asset = resultado.assets[0];
+
+    if (!asset?.uri) {
+      setError('No se ha podido obtener la imagen seleccionada.');
+      return;
+    }
+
+    if (!asset.base64) {
+      setError('No se ha podido preparar la imagen para subirla a Storage.');
+      return;
+    }
+
+    setImagenUri(asset.uri);
+    setImagenBase64(asset.base64);
+    setImagenMimeType(asset.mimeType ?? 'image/jpeg');
+    setError(null);
+  }
+
+  function quitarImagen() {
+    setImagenUri(null);
+    setImagenBase64(null);
+    setImagenMimeType(null);
+    setError(null);
+  }
+
+  function limpiarFormulario() {
+    setNombre('');
+    setColor('');
+    setNotas('');
+    setCategoria('superior');
+    setImagenUri(null);
+    setImagenBase64(null);
+    setImagenMimeType(null);
+    setError(null);
+  }
 
   const guardar = async () => {
     if (guardando) {
@@ -53,10 +117,18 @@ export function AltaPrendaPantalla({
       return;
     }
 
+    const imagenSeleccionada =
+      imagenBase64 && imagenMimeType
+        ? {
+            base64: imagenBase64,
+            mimeType: imagenMimeType,
+          }
+        : undefined;
+
     setGuardando(true);
     setError(null);
 
-    const resultado = await crearPrendaEnSupabase(entrada);
+    const resultado = await crearPrendaEnSupabase(entrada, imagenSeleccionada);
 
     setGuardando(false);
 
@@ -69,14 +141,12 @@ export function AltaPrendaPantalla({
 
     Alert.alert(
       'Prenda añadida',
-      `"${resultado.prenda.nombre}" se ha guardado en Supabase.`
+      imagenSeleccionada
+        ? `"${resultado.prenda.nombre}" se ha guardado con imagen.`
+        : `"${resultado.prenda.nombre}" se ha guardado en Supabase.`
     );
 
-    setNombre('');
-    setColor('');
-    setNotas('');
-    setCategoria('superior');
-    setError(null);
+    limpiarFormulario();
     navegarA('armario');
   };
 
@@ -88,6 +158,39 @@ export function AltaPrendaPantalla({
       />
 
       <View style={estilos.tarjeta}>
+        <Text style={estilos.etiqueta}>Imagen de la prenda</Text>
+
+        {imagenUri ? (
+          <Image
+            source={{ uri: imagenUri }}
+            style={estilos.imagenPreview}
+            resizeMode="cover"
+          />
+        ) : (
+          <View style={estilos.placeholderImagen}>
+            <Text style={estilos.textoPlaceholder}>Sin imagen seleccionada</Text>
+          </View>
+        )}
+
+        <View style={estilos.separador} />
+
+        <BotonPrincipal
+          texto={imagenUri ? 'Cambiar imagen' : 'Seleccionar imagen'}
+          variante="secundario"
+          onPress={seleccionarImagen}
+        />
+
+        {imagenUri && (
+          <>
+            <View style={estilos.separador} />
+            <BotonPrincipal
+              texto="Quitar imagen"
+              variante="secundario"
+              onPress={quitarImagen}
+            />
+          </>
+        )}
+
         <Text style={estilos.etiqueta}>Nombre</Text>
         <TextInput
           style={estilos.input}
@@ -176,6 +279,27 @@ const estilos = StyleSheet.create({
     fontWeight: '600',
     marginBottom: 6,
     marginTop: 8,
+  },
+  imagenPreview: {
+    width: '100%',
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+  },
+  placeholderImagen: {
+    width: '100%',
+    height: 150,
+    borderRadius: 12,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  textoPlaceholder: {
+    color: '#6b7280',
+    fontSize: 14,
+    fontWeight: '500',
   },
   input: {
     backgroundColor: '#f9fafb',

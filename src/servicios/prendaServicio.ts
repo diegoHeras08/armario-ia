@@ -1,3 +1,4 @@
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import {
   CategoriaPrenda,
@@ -5,16 +6,17 @@ import {
   Prenda,
 } from '../tipos/prenda';
 
-// Genera un identificador simple unico para prendas mock.
-// Combina marca temporal y un numero aleatorio corto.
+type ImagenPrendaEntrada = {
+  base64: string;
+  mimeType: string;
+};
+
 function generarIdPrenda(): string {
   const marca = Date.now().toString(36);
   const aleatorio = Math.random().toString(36).slice(2, 7);
   return `p-${marca}-${aleatorio}`;
 }
 
-// Construye una prenda completa a partir de la entrada del formulario.
-// Sigue siendo util para pruebas locales si Supabase no se usa.
 export function construirPrenda(entrada: NuevaPrendaEntrada): Prenda {
   return {
     id: generarIdPrenda(),
@@ -26,8 +28,6 @@ export function construirPrenda(entrada: NuevaPrendaEntrada): Prenda {
   };
 }
 
-// Validacion basica del formulario de alta de prenda.
-// Devuelve un mensaje de error o null si todo es correcto.
 export function validarNuevaPrenda(entrada: NuevaPrendaEntrada): string | null {
   if (entrada.nombre.trim().length < 2) {
     return 'El nombre debe tener al menos 2 caracteres.';
@@ -40,14 +40,18 @@ export function validarNuevaPrenda(entrada: NuevaPrendaEntrada): string | null {
   return null;
 }
 
-// Tipo auxiliar para representar como puede devolver Supabase
-// la relacion con la tabla categorias.
 type CategoriaRelacion =
   | { nombre: CategoriaPrenda }
   | { nombre: CategoriaPrenda }[]
   | null;
 
-// Forma esperada de una fila recibida desde Supabase.
+type ImagenPrendaRelacion =
+  | {
+      ruta_storage: string;
+      es_principal: boolean;
+    }[]
+  | null;
+
 type PrendaFilaSupabase = {
   id_prenda: string;
   nombre: string;
@@ -55,6 +59,7 @@ type PrendaFilaSupabase = {
   color_principal: string | null;
   fecha_alta: string;
   categorias?: CategoriaRelacion;
+  imagenes_prenda?: ImagenPrendaRelacion;
 };
 
 type UsuarioMvpFila = {
@@ -65,7 +70,6 @@ type CategoriaFila = {
   id_categoria: string;
 };
 
-// Obtiene la categoria desde la relacion devuelta por Supabase.
 function obtenerCategoriaDesdeRelacion(
   categoriaRelacion: CategoriaRelacion | undefined
 ): CategoriaPrenda {
@@ -76,7 +80,27 @@ function obtenerCategoriaDesdeRelacion(
   return categoriaRelacion?.nombre ?? 'otro';
 }
 
-// Convierte una fila de Supabase al modelo Prenda que usa la app.
+function obtenerImagenPrincipal(
+  imagenes: ImagenPrendaRelacion | undefined
+): string | undefined {
+  if (!imagenes || imagenes.length === 0 || !supabase) {
+    return undefined;
+  }
+
+  const imagenPrincipal =
+    imagenes.find((imagen) => imagen.es_principal) ?? imagenes[0];
+
+  if (!imagenPrincipal?.ruta_storage) {
+    return undefined;
+  }
+
+  const { data } = supabase.storage
+    .from('imagenes-prenda')
+    .getPublicUrl(imagenPrincipal.ruta_storage);
+
+  return data.publicUrl;
+}
+
 function mapearPrendaDesdeSupabase(fila: PrendaFilaSupabase): Prenda {
   return {
     id: fila.id_prenda,
@@ -84,12 +108,23 @@ function mapearPrendaDesdeSupabase(fila: PrendaFilaSupabase): Prenda {
     categoria: obtenerCategoriaDesdeRelacion(fila.categorias),
     color: fila.color_principal ?? '',
     notas: fila.descripcion ?? '',
+    imagenUrl: obtenerImagenPrincipal(fila.imagenes_prenda),
     fechaCreacion: fila.fecha_alta,
   };
 }
 
-// Lee prendas reales desde Supabase.
-// Si falla, devuelve error controlado y la app puede seguir usando mocks.
+function obtenerExtensionDesdeMimeType(mimeType: string): string {
+  if (mimeType.includes('png')) {
+    return 'png';
+  }
+
+  if (mimeType.includes('webp')) {
+    return 'webp';
+  }
+
+  return 'jpg';
+}
+
 export async function obtenerPrendasDesdeSupabase(): Promise<{
   prendas: Prenda[];
   error: string | null;
@@ -112,6 +147,10 @@ export async function obtenerPrendasDesdeSupabase(): Promise<{
       fecha_alta,
       categorias (
         nombre
+      ),
+      imagenes_prenda (
+        ruta_storage,
+        es_principal
       )
     `
     )
@@ -132,11 +171,63 @@ export async function obtenerPrendasDesdeSupabase(): Promise<{
   };
 }
 
-// Crea una prenda real en Supabase.
-// Usa el Usuario MVP temporal y la categoria seleccionada.
-// Mas adelante se sustituira por autenticacion real y auth.uid().
+async function subirImagenPrenda(
+  idPrenda: string,
+  imagen: ImagenPrendaEntrada
+): Promise<{
+  rutaStorage: string | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      rutaStorage: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const extension = obtenerExtensionDesdeMimeType(imagen.mimeType);
+  const rutaStorage = `prendas/${idPrenda}-${Date.now()}.${extension}`;
+
+  const { error } = await supabase.storage
+    .from('imagenes-prenda')
+    .upload(rutaStorage, decode(imagen.base64), {
+      contentType: imagen.mimeType,
+      upsert: false,
+    });
+
+  if (error) {
+    return {
+      rutaStorage: null,
+      error: error.message,
+    };
+  }
+
+  return {
+    rutaStorage,
+    error: null,
+  };
+}
+
+async function registrarImagenPrenda(
+  idPrenda: string,
+  rutaStorage: string
+): Promise<string | null> {
+  if (!supabase) {
+    return 'El cliente de Supabase no está configurado.';
+  }
+
+  const { error } = await supabase.from('imagenes_prenda').insert({
+    id_prenda: idPrenda,
+    ruta_storage: rutaStorage,
+    es_principal: true,
+  });
+
+  return error?.message ?? null;
+}
+
 export async function crearPrendaEnSupabase(
-  entrada: NuevaPrendaEntrada
+  entrada: NuevaPrendaEntrada,
+  imagen?: ImagenPrendaEntrada
 ): Promise<{
   prenda: Prenda | null;
   error: string | null;
@@ -241,10 +332,43 @@ export async function crearPrendaEnSupabase(
     };
   }
 
+  const filaInsertada = prendaInsertada as unknown as PrendaFilaSupabase;
+  let prendaFinal = mapearPrendaDesdeSupabase(filaInsertada);
+
+  if (imagen) {
+    const subida = await subirImagenPrenda(filaInsertada.id_prenda, imagen);
+
+    if (subida.error || !subida.rutaStorage) {
+      return {
+        prenda: null,
+        error: `La prenda se creó, pero falló la subida de imagen: ${subida.error}`,
+      };
+    }
+
+    const errorRegistroImagen = await registrarImagenPrenda(
+      filaInsertada.id_prenda,
+      subida.rutaStorage
+    );
+
+    if (errorRegistroImagen) {
+      return {
+        prenda: null,
+        error: `La imagen se subió, pero no se registró en la base de datos: ${errorRegistroImagen}`,
+      };
+    }
+
+    const { data } = supabase.storage
+      .from('imagenes-prenda')
+      .getPublicUrl(subida.rutaStorage);
+
+    prendaFinal = {
+      ...prendaFinal,
+      imagenUrl: data.publicUrl,
+    };
+  }
+
   return {
-    prenda: mapearPrendaDesdeSupabase(
-      prendaInsertada as unknown as PrendaFilaSupabase
-    ),
+    prenda: prendaFinal,
     error: null,
   };
 }
