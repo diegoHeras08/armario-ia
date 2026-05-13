@@ -133,6 +133,6 @@ const estilos = StyleSheet.create({
     fontWeight: '500',
   },
   separador: {
-    height: 10,npx tsc --noEmit
+    height: 10,
   },
 });

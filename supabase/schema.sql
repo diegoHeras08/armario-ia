@@ -29,12 +29,17 @@ create table if not exists categorias (
 
 -- Datos base de categorias soportadas por el MVP.
 insert into categorias (nombre, descripcion) values
-  ('superior', 'Prendas de la parte superior del cuerpo'),
-  ('inferior', 'Prendas de la parte inferior del cuerpo'),
-  ('calzado', 'Calzado en general'),
+  ('camiseta', 'Camisetas, tops y prendas basicas de torso'),
+  ('camisa', 'Camisas y prendas superiores formales o semiformales'),
+  ('jersey_sudadera', 'Jerseys, sudaderas y prendas superiores gruesas'),
+  ('chaqueta', 'Chaquetas, cazadoras y prendas exteriores ligeras'),
+  ('abrigo', 'Abrigos y prendas exteriores pesadas'),
+  ('pantalon', 'Pantalones, vaqueros y prendas inferiores largas'),
+  ('falda_short', 'Faldas, shorts y prendas inferiores cortas'),
+  ('vestido_mono', 'Vestidos, monos y prendas de cuerpo completo'),
+  ('calzado', 'Zapatos, zapatillas, botas y otro calzado'),
   ('accesorio', 'Complementos y accesorios'),
-  ('abrigo', 'Prendas de abrigo y entretiempo'),
-  ('otro', 'Otras prendas no clasificadas')
+  ('otro', 'Prendas no clasificadas')
 on conflict (nombre) do nothing;
 
 -- =========================================================

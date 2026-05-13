@@ -36,7 +36,7 @@ export function AltaPrendaPantalla({
   navegarA,
 }: PropiedadesAltaPrenda) {
   const [nombre, setNombre] = useState('');
-  const [categoria, setCategoria] = useState<CategoriaPrenda>('superior');
+  const [categoria, setCategoria] = useState<CategoriaPrenda>('camiseta');
   const [color, setColor] = useState('');
   const [notas, setNotas] = useState('');
 
@@ -96,7 +96,7 @@ export function AltaPrendaPantalla({
     setNombre('');
     setColor('');
     setNotas('');
-    setCategoria('superior');
+    setCategoria('camiseta');
     setImagenUri(null);
     setImagenBase64(null);
     setImagenMimeType(null);

@@ -378,9 +378,8 @@ export function TryOnPantalla({
             <Text style={estilos.resultadoTitulo}>Resultado provisional</Text>
             <Text style={estilos.texto}>{resultadoMock}</Text>
             <Text style={estilos.textoSecundario}>
-              Este resultado ya se ha añadido al historial temporal. En el
-              siguiente paso cargaremos el historial directamente desde
-              Supabase.
+              Este resultado ya se ha guardado en Supabase y aparecerá en el
+              historial persistente de la app.
             </Text>
 
             <View style={estilos.separador} />

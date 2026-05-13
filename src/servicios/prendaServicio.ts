@@ -41,8 +41,8 @@ export function validarNuevaPrenda(entrada: NuevaPrendaEntrada): string | null {
 }
 
 type CategoriaRelacion =
-  | { nombre: CategoriaPrenda }
-  | { nombre: CategoriaPrenda }[]
+  | { nombre: string }
+  | { nombre: string }[]
   | null;
 
 type ImagenPrendaRelacion =
@@ -70,14 +70,43 @@ type CategoriaFila = {
   id_categoria: string;
 };
 
+// Convierte nombres antiguos o no controlados de Supabase a categorías válidas
+// del modelo actual de la app.
+function normalizarCategoria(nombre: string | null | undefined): CategoriaPrenda {
+  switch (nombre) {
+    case 'camiseta':
+    case 'camisa':
+    case 'jersey_sudadera':
+    case 'chaqueta':
+    case 'abrigo':
+    case 'pantalon':
+    case 'falda_short':
+    case 'vestido_mono':
+    case 'calzado':
+    case 'accesorio':
+    case 'otro':
+      return nombre;
+
+    // Compatibilidad temporal con categorías antiguas.
+    case 'superior':
+      return 'camiseta';
+
+    case 'inferior':
+      return 'pantalon';
+
+    default:
+      return 'otro';
+  }
+}
+
 function obtenerCategoriaDesdeRelacion(
   categoriaRelacion: CategoriaRelacion | undefined
 ): CategoriaPrenda {
   if (Array.isArray(categoriaRelacion)) {
-    return categoriaRelacion[0]?.nombre ?? 'otro';
+    return normalizarCategoria(categoriaRelacion[0]?.nombre);
   }
 
-  return categoriaRelacion?.nombre ?? 'otro';
+  return normalizarCategoria(categoriaRelacion?.nombre);
 }
 
 function obtenerImagenPrincipal(

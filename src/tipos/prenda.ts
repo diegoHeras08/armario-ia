@@ -1,31 +1,47 @@
 // Tipos relacionados con la entidad Prenda y su clasificacion.
 
-// Categorias funcionales soportadas por la primera version del MVP.
+// Categorias funcionales soportadas por el MVP.
+// Se orientan a una organizacion visual del armario y al futuro flujo try-on.
 export type CategoriaPrenda =
-  | 'superior'
-  | 'inferior'
+  | 'camiseta'
+  | 'camisa'
+  | 'jersey_sudadera'
+  | 'chaqueta'
+  | 'abrigo'
+  | 'pantalon'
+  | 'falda_short'
+  | 'vestido_mono'
   | 'calzado'
   | 'accesorio'
-  | 'abrigo'
   | 'otro';
 
-// Lista ordenada de categorias para usar en interfaces (selectores, filtros).
+// Lista ordenada de categorias para usar en interfaces, selectores y filtros.
 export const CATEGORIAS_PRENDA: CategoriaPrenda[] = [
-  'superior',
-  'inferior',
+  'camiseta',
+  'camisa',
+  'jersey_sudadera',
+  'chaqueta',
+  'abrigo',
+  'pantalon',
+  'falda_short',
+  'vestido_mono',
   'calzado',
   'accesorio',
-  'abrigo',
   'otro',
 ];
 
 // Etiqueta legible asociada a cada categoria para mostrar al usuario.
 export const ETIQUETAS_CATEGORIA: Record<CategoriaPrenda, string> = {
-  superior: 'Superior',
-  inferior: 'Inferior',
+  camiseta: 'Camiseta',
+  camisa: 'Camisa',
+  jersey_sudadera: 'Jersey / Sudadera',
+  chaqueta: 'Chaqueta',
+  abrigo: 'Abrigo',
+  pantalon: 'Pantalón',
+  falda_short: 'Falda / Short',
+  vestido_mono: 'Vestido / Mono',
   calzado: 'Calzado',
   accesorio: 'Accesorio',
-  abrigo: 'Abrigo',
   otro: 'Otro',
 };
 

@@ -12,6 +12,8 @@ export function TarjetaPrenda({ prenda }: PropiedadesTarjetaPrenda) {
   const tieneColor = prenda.color.trim().length > 0;
   const tieneNotas = prenda.notas.trim().length > 0;
 
+  const etiquetaCategoria = ETIQUETAS_CATEGORIA[prenda.categoria] ?? 'Otro';
+
   return (
     <Tarjeta>
       {tieneImagen ? (
@@ -29,9 +31,7 @@ export function TarjetaPrenda({ prenda }: PropiedadesTarjetaPrenda) {
       <View style={estilos.encabezado}>
         <Text style={estilos.nombre}>{prenda.nombre}</Text>
         <View style={estilos.etiqueta}>
-          <Text style={estilos.textoEtiqueta}>
-            {ETIQUETAS_CATEGORIA[prenda.categoria]}
-          </Text>
+          <Text style={estilos.textoEtiqueta}>{etiquetaCategoria}</Text>
         </View>
       </View>
 

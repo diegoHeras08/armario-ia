@@ -6,7 +6,7 @@ export const PRENDAS_MOCK: Prenda[] = [
   {
     id: 'p-001',
     nombre: 'Camiseta blanca básica',
-    categoria: 'superior',
+    categoria: 'camiseta',
     color: 'Blanco',
     notas: 'Algodón, uso diario',
     fechaCreacion: '2025-01-15T10:00:00.000Z',
@@ -14,11 +14,11 @@ export const PRENDAS_MOCK: Prenda[] = [
   {
     id: 'p-002',
     nombre: 'Vaqueros azul oscuro',
-    categoria: 'inferior',
+    categoria: 'pantalon',
     color: 'Azul oscuro',
     notas: 'Corte recto',
     fechaCreacion: '2025-01-16T11:30:00.000Z',
-  },    
+  },
   {
     id: 'p-003',
     nombre: 'Zapatillas blancas',
@@ -30,7 +30,7 @@ export const PRENDAS_MOCK: Prenda[] = [
   {
     id: 'p-004',
     nombre: 'Chaqueta vaquera',
-    categoria: 'abrigo',
+    categoria: 'chaqueta',
     color: 'Azul medio',
     notas: 'Entretiempo',
     fechaCreacion: '2025-01-20T18:45:00.000Z',
