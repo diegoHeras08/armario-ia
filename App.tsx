@@ -23,6 +23,7 @@ import { HISTORIAL_MOCK } from './src/datos/historialMock';
 
 import { obtenerEstadoSupabase } from './src/servicios/supabaseEstadoServicio';
 import { obtenerPrendasDesdeSupabase } from './src/servicios/prendaServicio';
+import { obtenerHistorialTryOnDesdeSupabase } from './src/servicios/tryOnServicio';
 
 // Etiquetas legibles para la barra inferior de navegacion local.
 const ETIQUETAS_NAVEGACION: Record<NombrePantalla, string> = {
@@ -32,7 +33,7 @@ const ETIQUETAS_NAVEGACION: Record<NombrePantalla, string> = {
   tryOn: 'Try-on',
   historial: 'Historial',
 };
-//prueba commit
+
 const PANTALLAS_NAVEGABLES: NombrePantalla[] = [
   'dashboard',
   'armario',
@@ -50,8 +51,10 @@ export default function App() {
   // Empieza con datos mock para que la app funcione incluso si Supabase falla.
   const [prendas, setPrendas] = useState<Prenda[]>(PRENDAS_MOCK);
 
-  // Historial de resultados try-on. Sigue siendo provisional en esta fase.
-  const [historial] = useState<ResultadoTryOn[]>(HISTORIAL_MOCK);
+  // Historial de resultados try-on.
+  // Ahora se intenta cargar desde Supabase al iniciar.
+  const [historial, setHistorial] =
+    useState<ResultadoTryOn[]>(HISTORIAL_MOCK);
 
   // Indica si el armario está usando datos mock/locales o datos reales de Supabase.
   const [origenPrendas, setOrigenPrendas] = useState<'mock' | 'supabase'>(
@@ -61,8 +64,16 @@ export default function App() {
   // Indica si la app está intentando cargar prendas desde Supabase.
   const [cargandoPrendas, setCargandoPrendas] = useState<boolean>(true);
 
-  // Error controlado si falla la carga remota.
+  // Indica si la app está intentando cargar el historial desde Supabase.
+  const [cargandoHistorial, setCargandoHistorial] = useState<boolean>(true);
+
+  // Error controlado si falla la carga remota de prendas.
   const [errorCargaPrendas, setErrorCargaPrendas] = useState<string | null>(
+    null
+  );
+
+  // Error controlado si falla la carga remota del historial.
+  const [errorCargaHistorial, setErrorCargaHistorial] = useState<string | null>(
     null
   );
 
@@ -88,8 +99,6 @@ export default function App() {
           return;
         }
 
-        // Si Supabase responde correctamente, usamos sus datos aunque sean 0.
-        // Esto evita confundir datos mock con datos reales.
         setPrendas(resultado.prendas);
         setOrigenPrendas('supabase');
         setErrorCargaPrendas(null);
@@ -118,19 +127,67 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let componenteActivo = true;
+
+    async function cargarHistorialRemoto() {
+      try {
+        setCargandoHistorial(true);
+
+        const resultado = await obtenerHistorialTryOnDesdeSupabase();
+
+        if (!componenteActivo) {
+          return;
+        }
+
+        if (resultado.error) {
+          setErrorCargaHistorial(resultado.error);
+          return;
+        }
+
+        setHistorial(resultado.resultados);
+        setErrorCargaHistorial(null);
+      } catch (error) {
+        if (!componenteActivo) {
+          return;
+        }
+
+        setErrorCargaHistorial(
+          error instanceof Error
+            ? error.message
+            : 'Error inesperado al cargar el historial desde Supabase.'
+        );
+      } finally {
+        if (componenteActivo) {
+          setCargandoHistorial(false);
+        }
+      }
+    }
+
+    cargarHistorialRemoto();
+
+    return () => {
+      componenteActivo = false;
+    };
+  }, []);
+
   function navegarA(pantalla: NombrePantalla) {
     setPantallaActual(pantalla);
   }
 
-  // Anade una nueva prenda al estado local del armario.
-  // En la siguiente fase se conectara tambien con Supabase.
-  function anadirPrenda(prenda: Prenda) {
-  setPrendas((prev) => [prenda, ...prev]);
-
+  // Añade una nueva prenda al estado local del armario.
   // La prenda ya se ha guardado en Supabase desde AltaPrendaPantalla.
-  setOrigenPrendas('supabase');
-  setErrorCargaPrendas(null);
-}
+  function anadirPrenda(prenda: Prenda) {
+    setPrendas((prev) => [prenda, ...prev]);
+    setOrigenPrendas('supabase');
+    setErrorCargaPrendas(null);
+  }
+
+  // Añade un resultado try-on al historial local tras crear la sesión en Supabase.
+  function anadirResultadoTryOn(resultado: ResultadoTryOn) {
+    setHistorial((prev) => [resultado, ...prev]);
+    setErrorCargaHistorial(null);
+  }
 
   function renderizarPantalla() {
     switch (pantallaActual) {
@@ -155,7 +212,13 @@ export default function App() {
         );
 
       case 'tryOn':
-        return <TryOnPantalla navegarA={navegarA} />;
+        return (
+          <TryOnPantalla
+            prendas={prendas}
+            onResultadoCreado={anadirResultadoTryOn}
+            navegarA={navegarA}
+          />
+        );
 
       case 'historial':
         return (
@@ -192,6 +255,22 @@ export default function App() {
           <View style={estilos.avisoError}>
             <Text style={estilos.textoAvisoError}>
               Usando datos locales. Supabase: {errorCargaPrendas}
+            </Text>
+          </View>
+        )}
+
+        {cargandoHistorial && (
+          <View style={estilos.avisoCargaSecundario}>
+            <Text style={estilos.textoAvisoCarga}>
+              Cargando historial try-on...
+            </Text>
+          </View>
+        )}
+
+        {!cargandoHistorial && errorCargaHistorial && (
+          <View style={estilos.avisoError}>
+            <Text style={estilos.textoAvisoError}>
+              Historial no cargado: {errorCargaHistorial}
             </Text>
           </View>
         )}
@@ -259,6 +338,13 @@ const estilos = StyleSheet.create({
     backgroundColor: '#eff6ff',
     borderBottomWidth: 1,
     borderBottomColor: '#bfdbfe',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+  },
+  avisoCargaSecundario: {
+    backgroundColor: '#f8fafc',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
     paddingHorizontal: 16,
     paddingVertical: 8,
   },

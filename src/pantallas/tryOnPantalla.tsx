@@ -3,6 +3,7 @@ import {
   Alert,
   Image,
   ImageSourcePropType,
+  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,27 +14,49 @@ import * as ImagePicker from 'expo-image-picker';
 import { BotonPrincipal } from '../componentes/BotonPrincipal';
 import { EncabezadoPantalla } from '../componentes/EncabezadoPantalla';
 import { Tarjeta } from '../componentes/Tarjeta';
-import { PASOS_TRYON } from '../servicios/tryOnServicio';
+import {
+  crearSesionTryOnMockEnSupabase,
+  PASOS_TRYON,
+} from '../servicios/tryOnServicio';
 import { NombrePantalla } from '../tipos/navegacion';
+import { ETIQUETAS_CATEGORIA, Prenda } from '../tipos/prenda';
+import { ResultadoTryOn } from '../tipos/tryOn';
 import {
   guardarImagenUsuarioPrincipal,
   obtenerImagenUsuarioPrincipal,
 } from '../servicios/imagenUsuarioServicio';
 
-const imagenGuiaModelo = require('../../assets/modelo-guia.png');
+const imagenGuiaModelo: ImageSourcePropType = require('../../assets/modelo-guia.png');
 
 interface PropiedadesTryOn {
+  prendas: Prenda[];
+  onResultadoCreado: (resultado: ResultadoTryOn) => void;
   navegarA: (pantalla: NombrePantalla) => void;
 }
 
-export function TryOnPantalla({ navegarA }: PropiedadesTryOn) {
+export function TryOnPantalla({
+  prendas,
+  onResultadoCreado,
+  navegarA,
+}: PropiedadesTryOn) {
   const [imagenBaseUrl, setImagenBaseUrl] = useState<string | null>(null);
   const [imagenPreviewUri, setImagenPreviewUri] = useState<string | null>(null);
   const [imagenBase64, setImagenBase64] = useState<string | null>(null);
   const [imagenMimeType, setImagenMimeType] = useState<string | null>(null);
+
+  const [prendaSeleccionadaId, setPrendaSeleccionadaId] = useState<
+    string | null
+  >(null);
+
+  const [resultadoMock, setResultadoMock] = useState<string | null>(null);
+
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [generando, setGenerando] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const prendaSeleccionada =
+    prendas.find((prenda) => prenda.id === prendaSeleccionadaId) ?? null;
 
   useEffect(() => {
     let activo = true;
@@ -94,6 +117,7 @@ export function TryOnPantalla({ navegarA }: PropiedadesTryOn) {
     setImagenPreviewUri(asset.uri);
     setImagenBase64(asset.base64);
     setImagenMimeType(asset.mimeType ?? 'image/jpeg');
+    setResultadoMock(null);
     setError(null);
   }
 
@@ -155,6 +179,46 @@ export function TryOnPantalla({ navegarA }: PropiedadesTryOn) {
       source: imagenGuiaModelo,
       esGuia: true,
     };
+  }
+
+  async function generarSimulacionMock() {
+    if (generando) {
+      return;
+    }
+
+    if (!imagenBaseUrl) {
+      setError(
+        'Primero guarda una imagen base real del modelo. La imagen guía solo sirve como referencia.'
+      );
+      return;
+    }
+
+    if (!prendaSeleccionada) {
+      setError('Selecciona una prenda del armario antes de generar el try-on.');
+      return;
+    }
+
+    setGenerando(true);
+    setError(null);
+    setResultadoMock(null);
+
+    const resultado = await crearSesionTryOnMockEnSupabase(
+      prendaSeleccionada.id,
+      prendaSeleccionada.nombre
+    );
+
+    setGenerando(false);
+
+    if (resultado.error || !resultado.resultado) {
+      setError(`No se pudo crear la sesión try-on: ${resultado.error}`);
+      return;
+    }
+
+    onResultadoCreado(resultado.resultado);
+
+    setResultadoMock(
+      `Sesión try-on mock guardada en Supabase con la prenda "${resultado.resultado.prendaNombre}".`
+    );
   }
 
   const imagenMostrada = obtenerImagenMostrada();
@@ -221,6 +285,113 @@ export function TryOnPantalla({ navegarA }: PropiedadesTryOn) {
             />
           </>
         )}
+      </Tarjeta>
+
+      <Tarjeta>
+        <Text style={estilos.tituloTarjeta}>Seleccionar prenda</Text>
+        <Text style={estilos.texto}>
+          Elige una prenda del armario para preparar una simulación provisional.
+        </Text>
+
+        <View style={estilos.separador} />
+
+        {prendas.length === 0 ? (
+          <>
+            <Text style={estilos.texto}>
+              No hay prendas disponibles. Añade primero una prenda al armario.
+            </Text>
+            <View style={estilos.separador} />
+            <BotonPrincipal
+              texto="Añadir prenda"
+              onPress={() => navegarA('altaPrenda')}
+            />
+          </>
+        ) : (
+          prendas.map((prenda) => {
+            const activa = prenda.id === prendaSeleccionadaId;
+
+            return (
+              <Pressable
+                key={prenda.id}
+                onPress={() => {
+                  setPrendaSeleccionadaId(prenda.id);
+                  setResultadoMock(null);
+                  setError(null);
+                }}
+                style={[
+                  estilos.prendaOpcion,
+                  activa && estilos.prendaOpcionActiva,
+                ]}
+              >
+                {prenda.imagenUrl ? (
+                  <Image
+                    source={{ uri: prenda.imagenUrl }}
+                    style={estilos.prendaImagen}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={estilos.prendaImagenPlaceholder}>
+                    <Text style={estilos.prendaImagenTexto}>Sin imagen</Text>
+                  </View>
+                )}
+
+                <View style={estilos.prendaInfo}>
+                  <Text
+                    style={[
+                      estilos.prendaNombre,
+                      activa && estilos.prendaNombreActiva,
+                    ]}
+                  >
+                    {prenda.nombre}
+                  </Text>
+                  <Text
+                    style={[
+                      estilos.prendaCategoria,
+                      activa && estilos.prendaCategoriaActiva,
+                    ]}
+                  >
+                    {ETIQUETAS_CATEGORIA[prenda.categoria]} · {prenda.color}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </Tarjeta>
+
+      <Tarjeta>
+        <Text style={estilos.tituloTarjeta}>Simulación mock</Text>
+        <Text style={estilos.texto}>
+          Esta simulación todavía no usa IA real. Sirve para validar el flujo:
+          imagen base, prenda seleccionada y resultado provisional.
+        </Text>
+
+        <View style={estilos.separador} />
+
+        <BotonPrincipal
+          texto={generando ? 'Guardando sesión...' : 'Generar try-on mock'}
+          onPress={generarSimulacionMock}
+        />
+
+        {resultadoMock && (
+          <View style={estilos.resultadoMock}>
+            <Text style={estilos.resultadoTitulo}>Resultado provisional</Text>
+            <Text style={estilos.texto}>{resultadoMock}</Text>
+            <Text style={estilos.textoSecundario}>
+              Este resultado ya se ha añadido al historial temporal. En el
+              siguiente paso cargaremos el historial directamente desde
+              Supabase.
+            </Text>
+
+            <View style={estilos.separador} />
+
+            <BotonPrincipal
+              texto="Ver historial"
+              variante="secundario"
+              onPress={() => navegarA('historial')}
+            />
+          </View>
+        )}
 
         {error && <Text style={estilos.error}>{error}</Text>}
       </Tarjeta>
@@ -254,8 +425,8 @@ export function TryOnPantalla({ navegarA }: PropiedadesTryOn) {
       <Tarjeta>
         <Text style={estilos.tituloTarjeta}>Estado actual</Text>
         <Text style={estilos.texto}>
-          La imagen base queda preparada para la siguiente fase. La generación
-          real con IA se añadirá más adelante.
+          El flujo mock ya crea sesiones en Supabase. El siguiente paso será
+          cargar el historial persistente desde la base de datos.
         </Text>
         <View style={estilos.separador} />
         <BotonPrincipal
@@ -283,6 +454,12 @@ const estilos = StyleSheet.create({
     fontSize: 14,
     color: '#4b5563',
     lineHeight: 20,
+  },
+  textoSecundario: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
+    marginTop: 6,
   },
   imagenBase: {
     width: '100%',
@@ -313,6 +490,73 @@ const estilos = StyleSheet.create({
     fontSize: 13,
     color: '#6b7280',
     lineHeight: 18,
+  },
+  prendaOpcion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 10,
+    marginBottom: 8,
+  },
+  prendaOpcionActiva: {
+    backgroundColor: '#111827',
+    borderColor: '#111827',
+  },
+  prendaImagen: {
+    width: 54,
+    height: 54,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+  },
+  prendaImagenPlaceholder: {
+    width: 54,
+    height: 54,
+    borderRadius: 8,
+    backgroundColor: '#f3f4f6',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  prendaImagenTexto: {
+    fontSize: 10,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  prendaInfo: {
+    flex: 1,
+    marginLeft: 10,
+  },
+  prendaNombre: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#111827',
+  },
+  prendaNombreActiva: {
+    color: '#ffffff',
+  },
+  prendaCategoria: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  prendaCategoriaActiva: {
+    color: '#d1d5db',
+  },
+  resultadoMock: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 10,
+    backgroundColor: '#f3f4f6',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  resultadoTitulo: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 4,
   },
   paso: {
     flexDirection: 'row',
