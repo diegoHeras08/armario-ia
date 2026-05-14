@@ -19,22 +19,54 @@ export function HistorialPantalla({
     <ScrollView contentContainerStyle={estilos.contenedor}>
       <EncabezadoPantalla
         titulo="Historial"
-        subtitulo={`${resultados.length} resultados de simulaciones try-on`}
+        subtitulo={`${resultados.length} ${
+          resultados.length === 1 ? 'resultado guardado' : 'resultados guardados'
+        }`}
       />
+
+      <Tarjeta>
+        <Text style={estilos.tituloTarjeta}>Resumen del historial</Text>
+        <Text style={estilos.texto}>
+          Aquí se guardan las simulaciones try-on generadas. Actualmente los
+          resultados son provisionales, pero esta pantalla ya queda preparada
+          para mostrar imágenes generadas por IA real.
+        </Text>
+
+        <View style={estilos.resumenFila}>
+          <View style={estilos.resumenCaja}>
+            <Text style={estilos.numeroResumen}>{resultados.length}</Text>
+            <Text style={estilos.textoResumen}>
+              {resultados.length === 1 ? 'simulación' : 'simulaciones'}
+            </Text>
+          </View>
+
+          <View style={estilos.resumenCaja}>
+            <Text style={estilos.numeroResumen}>
+              {resultados.filter((r) => Boolean(r.resultadoImagenUrl)).length}
+            </Text>
+            <Text style={estilos.textoResumen}>con imagen</Text>
+          </View>
+        </View>
+      </Tarjeta>
 
       {resultados.length === 0 ? (
         <Tarjeta>
           <Text style={estilos.tituloVacio}>Sin resultados todavía</Text>
           <Text style={estilos.texto}>
-            Aquí aparecerán las simulaciones generadas. Por ahora puedes crear
-            una simulación provisional desde la pantalla Try-on.
+            Todavía no hay simulaciones guardadas. Crea una simulación
+            provisional desde Try-on para validar el flujo de imagen base,
+            prenda seleccionada e historial.
           </Text>
+
           <View style={estilos.separador} />
+
           <BotonPrincipal
             texto="Ir a Try-on"
             onPress={() => navegarA('tryOn')}
           />
+
           <View style={estilos.separador} />
+
           <BotonPrincipal
             texto="Volver al panel principal"
             variante="secundario"
@@ -44,6 +76,21 @@ export function HistorialPantalla({
       ) : (
         resultados.map((resultado) => (
           <Tarjeta key={resultado.id}>
+            <View style={estilos.encabezadoResultado}>
+              <View style={estilos.bloqueTituloResultado}>
+                <Text style={estilos.tituloResultado} numberOfLines={2}>
+                  {resultado.prendaNombre}
+                </Text>
+                <Text style={estilos.fechaResultado}>
+                  {formatearFecha(resultado.fechaCreacion)}
+                </Text>
+              </View>
+
+              <View style={estilos.etiquetaMock}>
+                <Text style={estilos.textoEtiquetaMock}>Mock</Text>
+              </View>
+            </View>
+
             {resultado.resultadoImagenUrl ? (
               <Image
                 source={{ uri: resultado.resultadoImagenUrl }}
@@ -56,19 +103,24 @@ export function HistorialPantalla({
               </View>
             )}
 
-            <Text style={estilos.tituloResultado}>
-              {resultado.prendaNombre}
-            </Text>
+            <View style={estilos.bloqueInfo}>
+              <Text style={estilos.tituloInfo}>Información de sesión</Text>
 
-            <Text style={estilos.detalle}>Sesión: {resultado.sesionId}</Text>
+              <Text style={estilos.detalle} numberOfLines={1}>
+                ID sesión: {resultado.sesionId}
+              </Text>
 
-            <Text style={estilos.detalle}>
-              Fecha: {new Date(resultado.fechaCreacion).toLocaleString()}
-            </Text>
+              <Text style={estilos.detalle}>
+                Estado: resultado provisional guardado en Supabase.
+              </Text>
+            </View>
 
-            <Text style={estilos.avisoMock}>
-              Resultado provisional generado en modo mock.
-            </Text>
+            <View style={estilos.avisoMock}>
+              <Text style={estilos.textoAvisoMock}>
+                Este resultado usa todavía el flujo mock. En la integración IA
+                real aquí se mostrará la imagen generada final.
+              </Text>
+            </View>
           </Tarjeta>
         ))
       )}
@@ -76,14 +128,30 @@ export function HistorialPantalla({
   );
 }
 
+function formatearFecha(fechaIso: string): string {
+  const fecha = new Date(fechaIso);
+
+  if (Number.isNaN(fecha.getTime())) {
+    return 'Fecha no disponible';
+  }
+
+  return fecha.toLocaleString();
+}
+
 const estilos = StyleSheet.create({
   contenedor: {
     padding: 16,
     paddingBottom: 32,
   },
+  tituloTarjeta: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
   tituloVacio: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
     marginBottom: 6,
   },
@@ -92,16 +160,74 @@ const estilos = StyleSheet.create({
     color: '#4b5563',
     lineHeight: 20,
   },
+  resumenFila: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 14,
+  },
+  resumenCaja: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  numeroResumen: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#111827',
+  },
+  textoResumen: {
+    fontSize: 13,
+    color: '#4b5563',
+    fontWeight: '600',
+    marginTop: 2,
+  },
+  encabezadoResultado: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 12,
+  },
+  bloqueTituloResultado: {
+    flex: 1,
+    marginRight: 10,
+  },
+  tituloResultado: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#111827',
+    lineHeight: 22,
+  },
+  fechaResultado: {
+    fontSize: 13,
+    color: '#6b7280',
+    marginTop: 3,
+  },
+  etiquetaMock: {
+    backgroundColor: '#fffbeb',
+    borderWidth: 1,
+    borderColor: '#fde68a',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+  },
+  textoEtiquetaMock: {
+    fontSize: 12,
+    color: '#92400e',
+    fontWeight: '700',
+  },
   imagenResultado: {
     width: '100%',
-    height: 260,
+    height: 280,
     borderRadius: 12,
     marginBottom: 12,
     backgroundColor: '#f3f4f6',
   },
   placeholderImagen: {
     width: '100%',
-    height: 180,
+    height: 190,
     borderRadius: 12,
     marginBottom: 12,
     backgroundColor: '#f3f4f6',
@@ -115,22 +241,33 @@ const estilos = StyleSheet.create({
     fontSize: 13,
     fontWeight: '500',
   },
-  tituloResultado: {
-    fontSize: 16,
-    fontWeight: '600',
+  bloqueInfo: {
+    marginTop: 2,
+  },
+  tituloInfo: {
+    fontSize: 14,
     color: '#111827',
+    fontWeight: '700',
     marginBottom: 4,
   },
   detalle: {
     fontSize: 13,
     color: '#6b7280',
+    lineHeight: 18,
     marginTop: 2,
   },
   avisoMock: {
-    marginTop: 8,
+    marginTop: 12,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  textoAvisoMock: {
     fontSize: 13,
-    color: '#92400e',
-    fontWeight: '500',
+    color: '#6b7280',
+    lineHeight: 18,
   },
   separador: {
     height: 10,

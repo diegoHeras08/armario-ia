@@ -101,9 +101,14 @@ function obtenerCategoriaDesdeRelacion(
   return normalizarCategoria(categoriaRelacion?.nombre);
 }
 
-function obtenerImagenPrincipal(
+function obtenerImagenPrincipalDesdeRelacion(
   imagenes: ImagenPrendaRelacion | undefined
-): string | undefined {
+):
+  | {
+      rutaStorage: string;
+      imagenUrl: string;
+    }
+  | undefined {
   if (!imagenes || imagenes.length === 0 || !supabase) {
     return undefined;
   }
@@ -119,16 +124,24 @@ function obtenerImagenPrincipal(
     .from('imagenes-prenda')
     .getPublicUrl(imagenPrincipal.ruta_storage);
 
-  return data.publicUrl;
+  return {
+    rutaStorage: imagenPrincipal.ruta_storage,
+    imagenUrl: data.publicUrl,
+  };
 }
 
 function mapearPrendaDesdeSupabase(fila: PrendaFilaSupabase): Prenda {
+  const imagenPrincipal = obtenerImagenPrincipalDesdeRelacion(
+    fila.imagenes_prenda
+  );
+
   return {
     id: fila.id_prenda,
     nombre: fila.nombre,
     categoria: obtenerCategoriaDesdeRelacion(fila.categorias),
     notas: fila.descripcion ?? '',
-    imagenUrl: obtenerImagenPrincipal(fila.imagenes_prenda),
+    imagenUrl: imagenPrincipal?.imagenUrl,
+    rutaStorageImagen: imagenPrincipal?.rutaStorage,
     fechaCreacion: fila.fecha_alta,
   };
 }
@@ -492,6 +505,7 @@ export async function crearPrendaEnSupabase(
     prendaFinal = {
       ...prendaFinal,
       imagenUrl: data.publicUrl,
+      rutaStorageImagen: subida.rutaStorage,
     };
   }
 

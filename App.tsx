@@ -43,42 +43,30 @@ const PANTALLAS_NAVEGABLES: NombrePantalla[] = [
 ];
 
 export default function App() {
-  // Pantalla actualmente activa.
   const [pantallaActual, setPantallaActual] =
     useState<NombrePantalla>('dashboard');
 
-  // Estado en memoria del armario.
-  // Empieza con datos mock para que la app funcione incluso si Supabase falla.
+  // Empieza con datos mock para que la app no quede vacia si Supabase falla.
   const [prendas, setPrendas] = useState<Prenda[]>(PRENDAS_MOCK);
 
-  // Historial de resultados try-on.
-  // Ahora se intenta cargar desde Supabase al iniciar.
+  // Empieza con historial mock como respaldo temporal.
   const [historial, setHistorial] =
     useState<ResultadoTryOn[]>(HISTORIAL_MOCK);
 
-  // Indica si el armario está usando datos mock/locales o datos reales de Supabase.
-  const [origenPrendas, setOrigenPrendas] = useState<'mock' | 'supabase'>(
-    'mock'
-  );
-
-  // Indica si la app está intentando cargar prendas desde Supabase.
   const [cargandoPrendas, setCargandoPrendas] = useState<boolean>(true);
-
-  // Indica si la app está intentando cargar el historial desde Supabase.
   const [cargandoHistorial, setCargandoHistorial] = useState<boolean>(true);
 
-  // Error controlado si falla la carga remota de prendas.
   const [errorCargaPrendas, setErrorCargaPrendas] = useState<string | null>(
     null
   );
 
-  // Error controlado si falla la carga remota del historial.
   const [errorCargaHistorial, setErrorCargaHistorial] = useState<string | null>(
     null
   );
 
-  // Comprobacion estatica de la configuracion de Supabase.
   const estadoSupabase = useMemo(() => obtenerEstadoSupabase(), []);
+
+  const cargandoDatosIniciales = cargandoPrendas || cargandoHistorial;
 
   useEffect(() => {
     let componenteActivo = true;
@@ -94,20 +82,17 @@ export default function App() {
         }
 
         if (resultado.error) {
-          setOrigenPrendas('mock');
           setErrorCargaPrendas(resultado.error);
           return;
         }
 
         setPrendas(resultado.prendas);
-        setOrigenPrendas('supabase');
         setErrorCargaPrendas(null);
       } catch (error) {
         if (!componenteActivo) {
           return;
         }
 
-        setOrigenPrendas('mock');
         setErrorCargaPrendas(
           error instanceof Error
             ? error.message
@@ -175,16 +160,11 @@ export default function App() {
     setPantallaActual(pantalla);
   }
 
-  // Añade una nueva prenda al estado local del armario.
-  // La prenda ya se ha guardado en Supabase desde AltaPrendaPantalla.
   function anadirPrenda(prenda: Prenda) {
     setPrendas((prev) => [prenda, ...prev]);
-    setOrigenPrendas('supabase');
     setErrorCargaPrendas(null);
   }
 
-  // Actualiza una prenda ya existente en el estado local.
-  // La actualizacion real ya se ha hecho en Supabase desde ArmarioPantalla.
   function actualizarPrendaEnEstado(prendaActualizada: Prenda) {
     setPrendas((prev) =>
       prev.map((prenda) =>
@@ -192,18 +172,14 @@ export default function App() {
       )
     );
 
-    setOrigenPrendas('supabase');
     setErrorCargaPrendas(null);
   }
 
-  // Quita una prenda del estado local tras marcarla como eliminada en Supabase.
   function eliminarPrendaEnEstado(idPrenda: string) {
     setPrendas((prev) => prev.filter((prenda) => prenda.id !== idPrenda));
-    setOrigenPrendas('supabase');
     setErrorCargaPrendas(null);
   }
 
-  // Añade un resultado try-on al historial local tras crear la sesión en Supabase.
   function anadirResultadoTryOn(resultado: ResultadoTryOn) {
     setHistorial((prev) => [resultado, ...prev]);
     setErrorCargaHistorial(null);
@@ -262,18 +238,10 @@ export default function App() {
       <StatusBar barStyle="dark-content" />
 
       <View style={estilos.contenido}>
-        {cargandoPrendas && (
+        {cargandoDatosIniciales && (
           <View style={estilos.avisoCarga}>
             <Text style={estilos.textoAvisoCarga}>
-              Comprobando prendas en Supabase...
-            </Text>
-          </View>
-        )}
-
-        {!cargandoPrendas && origenPrendas === 'supabase' && (
-          <View style={estilos.avisoCorrecto}>
-            <Text style={estilos.textoAvisoCorrecto}>
-              Prendas cargadas desde Supabase.
+              Sincronizando datos...
             </Text>
           </View>
         )}
@@ -281,15 +249,8 @@ export default function App() {
         {!cargandoPrendas && errorCargaPrendas && (
           <View style={estilos.avisoError}>
             <Text style={estilos.textoAvisoError}>
-              Usando datos locales. Supabase: {errorCargaPrendas}
-            </Text>
-          </View>
-        )}
-
-        {cargandoHistorial && (
-          <View style={estilos.avisoCargaSecundario}>
-            <Text style={estilos.textoAvisoCarga}>
-              Cargando historial try-on...
+              No se pudieron cargar las prendas desde Supabase. Se muestran
+              datos locales.
             </Text>
           </View>
         )}
@@ -297,7 +258,7 @@ export default function App() {
         {!cargandoHistorial && errorCargaHistorial && (
           <View style={estilos.avisoError}>
             <Text style={estilos.textoAvisoError}>
-              Historial no cargado: {errorCargaHistorial}
+              No se pudo cargar el historial try-on.
             </Text>
           </View>
         )}
@@ -362,13 +323,6 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
   },
   avisoCarga: {
-    backgroundColor: '#eff6ff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#bfdbfe',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  avisoCargaSecundario: {
     backgroundColor: '#f8fafc',
     borderBottomWidth: 1,
     borderBottomColor: '#e5e7eb',
@@ -376,19 +330,7 @@ const estilos = StyleSheet.create({
     paddingVertical: 8,
   },
   textoAvisoCarga: {
-    color: '#1d4ed8',
-    fontSize: 13,
-    fontWeight: '600',
-  },
-  avisoCorrecto: {
-    backgroundColor: '#ecfdf5',
-    borderBottomWidth: 1,
-    borderBottomColor: '#a7f3d0',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  textoAvisoCorrecto: {
-    color: '#047857',
+    color: '#374151',
     fontSize: 13,
     fontWeight: '600',
   },

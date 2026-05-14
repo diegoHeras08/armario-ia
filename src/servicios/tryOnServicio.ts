@@ -1,5 +1,6 @@
 import { supabase } from '../lib/supabase';
 import { EstadoTryOn, ResultadoTryOn, SesionTryOn } from '../tipos/tryOn';
+import { mockTryOnProvider } from './proveedoresTryOn/mockTryOnProvider';
 
 // Servicio del flujo try-on.
 // En esta fase se implementa persistencia mock en Supabase.
@@ -66,6 +67,11 @@ type ResultadoTryOnFilaSupabase = {
   sesiones_tryon?: SesionRelacion;
 };
 
+type DatosImagenPrendaTryOn = {
+  imagenPrendaUrl?: string;
+  rutaStorageImagenPrenda?: string;
+};
+
 // Construye una sesión try-on local en estado pendiente.
 // Sigue siendo útil para pruebas locales sin Supabase.
 export function crearSesionPendiente(prendaId: string): SesionTryOn {
@@ -88,16 +94,6 @@ function obtenerNombrePrenda(
   }
 
   return relacion?.nombre ?? fallback;
-}
-
-function obtenerRutaImagenUsuario(
-  relacion: ImagenUsuarioRelacion | undefined
-): string | null {
-  if (Array.isArray(relacion)) {
-    return relacion[0]?.ruta_storage ?? null;
-  }
-
-  return relacion?.ruta_storage ?? null;
 }
 
 function obtenerSesionDesdeRelacion(
@@ -130,21 +126,6 @@ function obtenerUrlPublicaImagenUsuario(
     .getPublicUrl(rutaStorage);
 
   return data.publicUrl;
-}
-
-function mapearSesionAResultadoTryOn(
-  fila: SesionTryOnFilaSupabase,
-  nombrePrendaFallback = 'Prenda seleccionada'
-): ResultadoTryOn {
-  const rutaImagenUsuario = obtenerRutaImagenUsuario(fila.imagenes_usuario);
-
-  return {
-    id: fila.id_sesion,
-    sesionId: fila.id_sesion,
-    prendaNombre: obtenerNombrePrenda(fila.prendas, nombrePrendaFallback),
-    resultadoImagenUrl: obtenerUrlPublicaImagenUsuario(rutaImagenUsuario),
-    fechaCreacion: fila.fecha_sesion,
-  };
 }
 
 function mapearResultadoTryOnDesdeSupabase(
@@ -256,11 +237,13 @@ async function obtenerImagenPrincipalUsuario(
 }
 
 // Crea una sesión try-on mock en Supabase y registra un resultado asociado.
-// En esta fase no se genera una imagen nueva: se reutiliza temporalmente la
-// imagen base del usuario como resultado mock.
+// La generación mock se delega en mockTryOnProvider.
+// En esta fase el proveedor reutiliza la ruta Storage de la imagen base.
+// Ya acepta datos de imagen de prenda para preparar la futura integración IA real.
 export async function crearSesionTryOnMockEnSupabase(
   prendaId: string,
-  prendaNombreFallback: string
+  prendaNombreFallback: string,
+  datosImagenPrenda?: DatosImagenPrendaTryOn
 ): Promise<{
   resultado: ResultadoTryOn | null;
   error: string | null;
@@ -291,6 +274,36 @@ export async function crearSesionTryOnMockEnSupabase(
     return {
       resultado: null,
       error: imagenPrincipal.error,
+    };
+  }
+
+  const imagenBaseUrl = obtenerUrlPublicaImagenUsuario(
+    imagenPrincipal.rutaStorage
+  );
+
+  if (!imagenBaseUrl) {
+    return {
+      resultado: null,
+      error: 'No se ha podido obtener la URL pública de la imagen base.',
+    };
+  }
+
+  const resultadoGeneracion = await mockTryOnProvider.generarResultado({
+    idPrenda: prendaId,
+    nombrePrenda: prendaNombreFallback,
+    imagenBaseUrl,
+    rutaStorageImagenBase: imagenPrincipal.rutaStorage,
+    imagenPrendaUrl: datosImagenPrenda?.imagenPrendaUrl,
+    rutaStorageImagenPrenda: datosImagenPrenda?.rutaStorageImagenPrenda,
+  });
+
+  if (
+    resultadoGeneracion.estado !== 'completado' ||
+    !resultadoGeneracion.rutaStorageResultado
+  ) {
+    return {
+      resultado: null,
+      error: resultadoGeneracion.mensaje,
     };
   }
 
@@ -338,7 +351,7 @@ export async function crearSesionTryOnMockEnSupabase(
     .from('resultados_tryon')
     .insert({
       id_sesion: sesion.id_sesion,
-      ruta_storage: imagenPrincipal.rutaStorage,
+      ruta_storage: resultadoGeneracion.rutaStorageResultado,
     })
     .select(
       `

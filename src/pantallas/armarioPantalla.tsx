@@ -336,6 +336,7 @@ export function ArmarioPantalla({
               <BotonPrincipal
                 texto={guardandoEdicion ? 'Guardando...' : 'Guardar cambios'}
                 onPress={guardarEdicion}
+                deshabilitado={guardandoEdicion}
               />
 
               <View style={estilos.separador} />
@@ -372,36 +373,48 @@ export function ArmarioPantalla({
                 <Text style={estilos.error}>{errorEliminacion}</Text>
               )}
 
-              <View style={estilos.separador} />
+              <View style={estilos.seccionAcciones}>
+                <Text style={estilos.tituloSeccion}>Acciones principales</Text>
 
-              <BotonPrincipal
-                texto="Editar prenda"
-                onPress={iniciarEdicion}
-              />
+                <BotonPrincipal texto="Editar prenda" onPress={iniciarEdicion} />
 
-              <View style={estilos.separador} />
+                <View style={estilos.separador} />
 
-              <BotonPrincipal
-                texto={cambiandoImagen ? 'Cambiando foto...' : 'Cambiar foto'}
-                variante="secundario"
-                onPress={cambiarFotoPrenda}
-              />
+                <BotonPrincipal
+                  texto={cambiandoImagen ? 'Cambiando foto...' : 'Cambiar foto'}
+                  variante="secundario"
+                  onPress={cambiarFotoPrenda}
+                  deshabilitado={cambiandoImagen}
+                />
+              </View>
 
-              <View style={estilos.separador} />
+              <View style={estilos.seccionAcciones}>
+                <Text style={estilos.tituloSeccion}>Navegación</Text>
 
-              <BotonPrincipal
-                texto={eliminando ? 'Eliminando...' : 'Eliminar prenda'}
-                variante="secundario"
-                onPress={confirmarEliminacion}
-              />
+                <BotonPrincipal
+                  texto="Volver al armario"
+                  variante="secundario"
+                  onPress={cerrarDetalle}
+                />
+              </View>
 
-              <View style={estilos.separador} />
+              <View style={estilos.zonaPeligro}>
+                <Text style={estilos.tituloPeligro}>Zona peligrosa</Text>
+                <Text style={estilos.textoPeligro}>
+                  Esta acción oculta la prenda del armario, pero conserva sus
+                  datos en Supabase para no romper relaciones con imágenes o
+                  sesiones try-on.
+                </Text>
 
-              <BotonPrincipal
-                texto="Volver al armario"
-                variante="secundario"
-                onPress={cerrarDetalle}
-              />
+                <View style={estilos.separador} />
+
+                <BotonPrincipal
+                  texto={eliminando ? 'Eliminando...' : 'Eliminar prenda'}
+                  variante="peligro"
+                  onPress={confirmarEliminacion}
+                  deshabilitado={eliminando}
+                />
+              </View>
             </>
           )}
         </View>
@@ -577,6 +590,7 @@ const estilos = StyleSheet.create({
   },
   bloqueInfo: {
     marginTop: 4,
+    marginBottom: 8,
   },
   tituloInfo: {
     fontSize: 14,
@@ -588,6 +602,34 @@ const estilos = StyleSheet.create({
     fontSize: 14,
     color: '#4b5563',
     lineHeight: 20,
+  },
+  seccionAcciones: {
+    marginTop: 18,
+  },
+  tituloSeccion: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 8,
+  },
+  zonaPeligro: {
+    marginTop: 24,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#fff7f7',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  tituloPeligro: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#991b1b',
+    marginBottom: 4,
+  },
+  textoPeligro: {
+    fontSize: 13,
+    color: '#7f1d1d',
+    lineHeight: 18,
   },
   etiquetaFormulario: {
     fontSize: 13,

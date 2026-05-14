@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, Text, ViewStyle } from 'react-native';
 interface PropiedadesBoton {
   texto: string;
   onPress: () => void;
-  variante?: 'principal' | 'secundario';
+  variante?: 'principal' | 'secundario' | 'peligro';
   deshabilitado?: boolean;
   estiloAdicional?: ViewStyle;
 }
@@ -17,9 +17,18 @@ export function BotonPrincipal({
   estiloAdicional,
 }: PropiedadesBoton) {
   const estiloBase =
-    variante === 'principal' ? estilos.botonPrincipal : estilos.botonSecundario;
+    variante === 'principal'
+      ? estilos.botonPrincipal
+      : variante === 'peligro'
+        ? estilos.botonPeligro
+        : estilos.botonSecundario;
+
   const estiloTexto =
-    variante === 'principal' ? estilos.textoPrincipal : estilos.textoSecundario;
+    variante === 'principal'
+      ? estilos.textoPrincipal
+      : variante === 'peligro'
+        ? estilos.textoPeligro
+        : estilos.textoSecundario;
 
   return (
     <Pressable
@@ -53,6 +62,15 @@ const estilos = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#d1d5db',
   },
+  botonPeligro: {
+    backgroundColor: '#fef2f2',
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    borderRadius: 10,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
   botonDeshabilitado: {
     opacity: 0.5,
   },
@@ -65,5 +83,10 @@ const estilos = StyleSheet.create({
     color: '#111827',
     fontSize: 15,
     fontWeight: '600',
+  },
+  textoPeligro: {
+    color: '#b91c1c',
+    fontSize: 15,
+    fontWeight: '700',
   },
 });

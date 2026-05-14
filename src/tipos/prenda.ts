@@ -51,7 +51,14 @@ export interface Prenda {
   nombre: string;
   categoria: CategoriaPrenda;
   notas: string;
+
+  // URL publica usada por la interfaz para mostrar la imagen.
   imagenUrl?: string;
+
+  // Ruta interna en Supabase Storage.
+  // Se usara mas adelante para proveedores IA, backend y gestion de resultados.
+  rutaStorageImagen?: string;
+
   fechaCreacion: string;
 }
 

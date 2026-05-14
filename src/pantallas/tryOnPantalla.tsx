@@ -58,6 +58,10 @@ export function TryOnPantalla({
   const prendaSeleccionada =
     prendas.find((prenda) => prenda.id === prendaSeleccionadaId) ?? null;
 
+  const hayImagenPendiente = Boolean(imagenPreviewUri);
+  const hayImagenBaseGuardada = Boolean(imagenBaseUrl);
+  const hayPrendaSeleccionada = Boolean(prendaSeleccionada);
+
   useEffect(() => {
     let activo = true;
 
@@ -204,7 +208,11 @@ export function TryOnPantalla({
 
     const resultado = await crearSesionTryOnMockEnSupabase(
       prendaSeleccionada.id,
-      prendaSeleccionada.nombre
+      prendaSeleccionada.nombre,
+      {
+        imagenPrendaUrl: prendaSeleccionada.imagenUrl,
+        rutaStorageImagenPrenda: prendaSeleccionada.rutaStorageImagen,
+      }
     );
 
     setGenerando(false);
@@ -227,15 +235,50 @@ export function TryOnPantalla({
     <ScrollView contentContainerStyle={estilos.contenedor}>
       <EncabezadoPantalla
         titulo="Try-on"
-        subtitulo="Imagen base del modelo y simulación visual"
+        subtitulo="Preparación de imagen base, prenda y simulación provisional"
       />
 
       <Tarjeta>
-        <Text style={estilos.tituloTarjeta}>Imagen base del modelo</Text>
+        <View style={estilos.encabezadoTarjeta}>
+          <View>
+            <Text style={estilos.tituloTarjeta}>Imagen base del modelo</Text>
+            <Text style={estilos.textoSecundario}>
+              Referencia corporal para futuras generaciones con IA.
+            </Text>
+          </View>
+
+          <View
+            style={[
+              estilos.estadoMini,
+              hayImagenBaseGuardada
+                ? estilos.estadoMiniOk
+                : hayImagenPendiente
+                  ? estilos.estadoMiniPendiente
+                  : estilos.estadoMiniNeutro,
+            ]}
+          >
+            <Text
+              style={[
+                estilos.textoEstadoMini,
+                hayImagenBaseGuardada
+                  ? estilos.textoEstadoMiniOk
+                  : hayImagenPendiente
+                    ? estilos.textoEstadoMiniPendiente
+                    : estilos.textoEstadoMiniNeutro,
+              ]}
+            >
+              {hayImagenBaseGuardada
+                ? 'Guardada'
+                : hayImagenPendiente
+                  ? 'Pendiente'
+                  : 'Guía'}
+            </Text>
+          </View>
+        </View>
+
         <Text style={estilos.texto}>
-          Esta imagen será la referencia corporal que se usará más adelante para
-          probar prendas mediante IA. Debe ser frontal, de cuerpo completo, con
-          brazos ligeramente separados y fondo limpio.
+          La foto debe ser frontal, de cuerpo completo, con brazos ligeramente
+          separados y fondo limpio.
         </Text>
 
         <View style={estilos.separador} />
@@ -256,10 +299,12 @@ export function TryOnPantalla({
             />
 
             {imagenMostrada.esGuia && (
-              <Text style={estilos.textoGuia}>
-                Imagen guía: usa una pose similar a este modelo para subir tu
-                foto base.
-              </Text>
+              <View style={estilos.avisoGuia}>
+                <Text style={estilos.textoGuia}>
+                  Imagen guía. Sirve para indicar la pose recomendada, pero no
+                  se usa para generar simulaciones.
+                </Text>
+              </View>
             )}
           </>
         )}
@@ -282,21 +327,46 @@ export function TryOnPantalla({
             <BotonPrincipal
               texto={guardando ? 'Guardando...' : 'Guardar como imagen base'}
               onPress={guardarImagenBase}
+              deshabilitado={guardando}
             />
           </>
         )}
       </Tarjeta>
 
       <Tarjeta>
-        <Text style={estilos.tituloTarjeta}>Seleccionar prenda</Text>
-        <Text style={estilos.texto}>
-          Elige una prenda del armario para preparar una simulación provisional.
-        </Text>
+        <View style={estilos.encabezadoTarjeta}>
+          <View>
+            <Text style={estilos.tituloTarjeta}>Prenda seleccionada</Text>
+            <Text style={estilos.textoSecundario}>
+              Elige una prenda activa del armario.
+            </Text>
+          </View>
+
+          <View
+            style={[
+              estilos.estadoMini,
+              hayPrendaSeleccionada
+                ? estilos.estadoMiniOk
+                : estilos.estadoMiniNeutro,
+            ]}
+          >
+            <Text
+              style={[
+                estilos.textoEstadoMini,
+                hayPrendaSeleccionada
+                  ? estilos.textoEstadoMiniOk
+                  : estilos.textoEstadoMiniNeutro,
+              ]}
+            >
+              {hayPrendaSeleccionada ? 'Lista' : 'Sin elegir'}
+            </Text>
+          </View>
+        </View>
 
         <View style={estilos.separador} />
 
         {prendas.length === 0 ? (
-          <>
+          <View style={estilos.estadoVacio}>
             <Text style={estilos.texto}>
               No hay prendas disponibles. Añade primero una prenda al armario.
             </Text>
@@ -305,7 +375,7 @@ export function TryOnPantalla({
               texto="Añadir prenda"
               onPress={() => navegarA('altaPrenda')}
             />
-          </>
+          </View>
         ) : (
           prendas.map((prenda) => {
             const activa = prenda.id === prendaSeleccionadaId;
@@ -341,6 +411,7 @@ export function TryOnPantalla({
                       estilos.prendaNombre,
                       activa && estilos.prendaNombreActiva,
                     ]}
+                    numberOfLines={1}
                   >
                     {prenda.nombre}
                   </Text>
@@ -353,6 +424,15 @@ export function TryOnPantalla({
                     {ETIQUETAS_CATEGORIA[prenda.categoria]}
                   </Text>
                 </View>
+
+                <Text
+                  style={[
+                    estilos.textoSeleccion,
+                    activa && estilos.textoSeleccionActivo,
+                  ]}
+                >
+                  {activa ? 'Seleccionada' : 'Elegir'}
+                </Text>
               </Pressable>
             );
           })
@@ -360,17 +440,48 @@ export function TryOnPantalla({
       </Tarjeta>
 
       <Tarjeta>
-        <Text style={estilos.tituloTarjeta}>Simulación mock</Text>
+        <View style={estilos.encabezadoTarjeta}>
+          <View>
+            <Text style={estilos.tituloTarjeta}>Simulación provisional</Text>
+            <Text style={estilos.textoSecundario}>
+              Flujo mock para validar sesiones e historial.
+            </Text>
+          </View>
+
+          <View style={[estilos.estadoMini, estilos.estadoMiniPendiente]}>
+            <Text style={[estilos.textoEstadoMini, estilos.textoEstadoMiniPendiente]}>
+              Mock
+            </Text>
+          </View>
+        </View>
+
         <Text style={estilos.texto}>
-          Esta simulación todavía no usa IA real. Sirve para validar el flujo:
-          imagen base, prenda seleccionada y resultado provisional.
+          Todavía no se llama a un modelo de IA real. Esta acción crea una
+          sesión try-on provisional en Supabase usando la imagen base guardada.
         </Text>
+
+        <View style={estilos.resumenFlujo}>
+          <FilaEstado
+            texto="Imagen base guardada"
+            completado={hayImagenBaseGuardada}
+          />
+          <FilaEstado
+            texto="Prenda seleccionada"
+            completado={hayPrendaSeleccionada}
+          />
+          <FilaEstado
+            texto="Resultado real con IA"
+            completado={false}
+            pendiente
+          />
+        </View>
 
         <View style={estilos.separador} />
 
         <BotonPrincipal
           texto={generando ? 'Guardando sesión...' : 'Generar try-on mock'}
           onPress={generarSimulacionMock}
+          deshabilitado={generando}
         />
 
         {resultadoMock && (
@@ -378,8 +489,8 @@ export function TryOnPantalla({
             <Text style={estilos.resultadoTitulo}>Resultado provisional</Text>
             <Text style={estilos.texto}>{resultadoMock}</Text>
             <Text style={estilos.textoSecundario}>
-              Este resultado ya se ha guardado en Supabase y aparecerá en el
-              historial persistente de la app.
+              El resultado se ha añadido al historial. En la siguiente fase se
+              sustituirá por una imagen generada con IA real.
             </Text>
 
             <View style={estilos.separador} />
@@ -396,21 +507,25 @@ export function TryOnPantalla({
       </Tarjeta>
 
       <Tarjeta>
-        <Text style={estilos.tituloTarjeta}>Requisitos de la imagen</Text>
-        <Text style={estilos.texto}>• Cuerpo completo visible.</Text>
-        <Text style={estilos.texto}>• Pose frontal y recta.</Text>
-        <Text style={estilos.texto}>
-          • Brazos relajados, ligeramente separados del torso.
-        </Text>
-        <Text style={estilos.texto}>• Fondo liso y buena iluminación.</Text>
-        <Text style={estilos.texto}>
-          • Evitar selfies, ángulos laterales, sombras fuertes o ropa muy
-          voluminosa.
-        </Text>
+        <Text style={estilos.tituloTarjeta}>Requisitos de la imagen base</Text>
+
+        <View style={estilos.listaRequisitos}>
+          <Text style={estilos.texto}>• Cuerpo completo visible.</Text>
+          <Text style={estilos.texto}>• Pose frontal y recta.</Text>
+          <Text style={estilos.texto}>
+            • Brazos relajados, ligeramente separados del torso.
+          </Text>
+          <Text style={estilos.texto}>• Fondo liso y buena iluminación.</Text>
+          <Text style={estilos.texto}>
+            • Evitar selfies, ángulos laterales, sombras fuertes o ropa muy
+            voluminosa.
+          </Text>
+        </View>
       </Tarjeta>
 
       <Tarjeta>
-        <Text style={estilos.tituloTarjeta}>Flujo previsto</Text>
+        <Text style={estilos.tituloTarjeta}>Flujo técnico previsto</Text>
+
         {PASOS_TRYON.map((paso, indice) => (
           <View key={indice} style={estilos.paso}>
             <View style={estilos.numero}>
@@ -419,16 +534,16 @@ export function TryOnPantalla({
             <Text style={estilos.textoPaso}>{paso}</Text>
           </View>
         ))}
-      </Tarjeta>
 
-      <Tarjeta>
-        <Text style={estilos.tituloTarjeta}>Estado actual</Text>
-        <Text style={estilos.texto}>
-          El flujo mock ya crea sesiones y resultados en Supabase. El siguiente
-          paso será sustituir el resultado provisional por una generación real
-          con IA.
-        </Text>
         <View style={estilos.separador} />
+
+        <Text style={estilos.textoSecundario}>
+          Estado actual: el flujo mock crea sesiones en Supabase. Queda
+          pendiente sustituirlo por generación real con IA.
+        </Text>
+
+        <View style={estilos.separador} />
+
         <BotonPrincipal
           texto="Volver al panel principal"
           variante="secundario"
@@ -439,16 +554,46 @@ export function TryOnPantalla({
   );
 }
 
+interface PropiedadesFilaEstado {
+  texto: string;
+  completado: boolean;
+  pendiente?: boolean;
+}
+
+function FilaEstado({ texto, completado, pendiente = false }: PropiedadesFilaEstado) {
+  return (
+    <View style={estilos.filaEstado}>
+      <View
+        style={[
+          estilos.puntoEstado,
+          completado
+            ? estilos.puntoEstadoOk
+            : pendiente
+              ? estilos.puntoEstadoPendiente
+              : estilos.puntoEstadoNeutro,
+        ]}
+      />
+      <Text style={estilos.textoFilaEstado}>{texto}</Text>
+    </View>
+  );
+}
+
 const estilos = StyleSheet.create({
   contenedor: {
     padding: 16,
     paddingBottom: 32,
   },
+  encabezadoTarjeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
   tituloTarjeta: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
-    marginBottom: 10,
+    marginBottom: 3,
   },
   texto: {
     fontSize: 14,
@@ -459,7 +604,38 @@ const estilos = StyleSheet.create({
     fontSize: 13,
     color: '#6b7280',
     lineHeight: 18,
-    marginTop: 6,
+  },
+  estadoMini: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 999,
+    borderWidth: 1,
+    marginLeft: 10,
+  },
+  estadoMiniOk: {
+    backgroundColor: '#ecfdf5',
+    borderColor: '#a7f3d0',
+  },
+  estadoMiniPendiente: {
+    backgroundColor: '#fffbeb',
+    borderColor: '#fde68a',
+  },
+  estadoMiniNeutro: {
+    backgroundColor: '#f9fafb',
+    borderColor: '#e5e7eb',
+  },
+  textoEstadoMini: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  textoEstadoMiniOk: {
+    color: '#047857',
+  },
+  textoEstadoMiniPendiente: {
+    color: '#92400e',
+  },
+  textoEstadoMiniNeutro: {
+    color: '#374151',
   },
   imagenBase: {
     width: '100%',
@@ -485,11 +661,21 @@ const estilos = StyleSheet.create({
     fontSize: 14,
     fontWeight: '500',
   },
-  textoGuia: {
+  avisoGuia: {
     marginTop: 8,
+    padding: 10,
+    borderRadius: 10,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  textoGuia: {
     fontSize: 13,
     color: '#6b7280',
     lineHeight: 18,
+  },
+  estadoVacio: {
+    marginTop: 4,
   },
   prendaOpcion: {
     flexDirection: 'row',
@@ -506,15 +692,15 @@ const estilos = StyleSheet.create({
     borderColor: '#111827',
   },
   prendaImagen: {
-    width: 54,
-    height: 54,
-    borderRadius: 8,
+    width: 56,
+    height: 56,
+    borderRadius: 9,
     backgroundColor: '#f3f4f6',
   },
   prendaImagenPlaceholder: {
-    width: 54,
-    height: 54,
-    borderRadius: 8,
+    width: 56,
+    height: 56,
+    borderRadius: 9,
     backgroundColor: '#f3f4f6',
     alignItems: 'center',
     justifyContent: 'center',
@@ -530,7 +716,7 @@ const estilos = StyleSheet.create({
   },
   prendaNombre: {
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#111827',
   },
   prendaNombreActiva: {
@@ -540,14 +726,57 @@ const estilos = StyleSheet.create({
     fontSize: 12,
     color: '#6b7280',
     marginTop: 2,
+    fontWeight: '500',
   },
   prendaCategoriaActiva: {
     color: '#d1d5db',
   },
+  textoSeleccion: {
+    fontSize: 12,
+    color: '#6b7280',
+    fontWeight: '700',
+    marginLeft: 8,
+  },
+  textoSeleccionActivo: {
+    color: '#ffffff',
+  },
+  resumenFlujo: {
+    marginTop: 12,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#f9fafb',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  filaEstado: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  puntoEstado: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 8,
+  },
+  puntoEstadoOk: {
+    backgroundColor: '#10b981',
+  },
+  puntoEstadoPendiente: {
+    backgroundColor: '#f59e0b',
+  },
+  puntoEstadoNeutro: {
+    backgroundColor: '#d1d5db',
+  },
+  textoFilaEstado: {
+    fontSize: 13,
+    color: '#374151',
+    fontWeight: '600',
+  },
   resultadoMock: {
     marginTop: 12,
     padding: 12,
-    borderRadius: 10,
+    borderRadius: 12,
     backgroundColor: '#f3f4f6',
     borderWidth: 1,
     borderColor: '#e5e7eb',
@@ -557,6 +786,9 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 4,
+  },
+  listaRequisitos: {
+    marginTop: 2,
   },
   paso: {
     flexDirection: 'row',
@@ -588,6 +820,7 @@ const estilos = StyleSheet.create({
     color: '#b91c1c',
     fontSize: 13,
     marginTop: 12,
+    fontWeight: '600',
   },
   separador: {
     height: 10,
