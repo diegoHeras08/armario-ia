@@ -22,7 +22,6 @@ export function construirPrenda(entrada: NuevaPrendaEntrada): Prenda {
     id: generarIdPrenda(),
     nombre: entrada.nombre.trim(),
     categoria: entrada.categoria,
-    color: entrada.color.trim(),
     notas: entrada.notas.trim(),
     fechaCreacion: new Date().toISOString(),
   };
@@ -31,10 +30,6 @@ export function construirPrenda(entrada: NuevaPrendaEntrada): Prenda {
 export function validarNuevaPrenda(entrada: NuevaPrendaEntrada): string | null {
   if (entrada.nombre.trim().length < 2) {
     return 'El nombre debe tener al menos 2 caracteres.';
-  }
-
-  if (entrada.color.trim().length < 2) {
-    return 'Indica un color válido.';
   }
 
   return null;
@@ -56,7 +51,6 @@ type PrendaFilaSupabase = {
   id_prenda: string;
   nombre: string;
   descripcion: string | null;
-  color_principal: string | null;
   fecha_alta: string;
   categorias?: CategoriaRelacion;
   imagenes_prenda?: ImagenPrendaRelacion;
@@ -135,7 +129,6 @@ function mapearPrendaDesdeSupabase(fila: PrendaFilaSupabase): Prenda {
     id: fila.id_prenda,
     nombre: fila.nombre,
     categoria: obtenerCategoriaDesdeRelacion(fila.categorias),
-    color: fila.color_principal ?? '',
     notas: fila.descripcion ?? '',
     imagenUrl: obtenerImagenPrincipal(fila.imagenes_prenda),
     fechaCreacion: fila.fecha_alta,
@@ -152,6 +145,48 @@ function obtenerExtensionDesdeMimeType(mimeType: string): string {
   }
 
   return 'jpg';
+}
+
+async function obtenerCategoriaPorNombre(
+  categoria: CategoriaPrenda
+): Promise<{
+  idCategoria: string | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      idCategoria: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('categorias')
+    .select('id_categoria')
+    .eq('nombre', categoria)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      idCategoria: null,
+      error: `Error al consultar la categoría: ${error.message}`,
+    };
+  }
+
+  if (!data) {
+    return {
+      idCategoria: null,
+      error: `No se ha encontrado la categoría "${categoria}" en Supabase.`,
+    };
+  }
+
+  const categoriaEncontrada = data as CategoriaFila;
+
+  return {
+    idCategoria: categoriaEncontrada.id_categoria,
+    error: null,
+  };
 }
 
 export async function obtenerPrendasDesdeSupabase(): Promise<{
@@ -172,7 +207,6 @@ export async function obtenerPrendasDesdeSupabase(): Promise<{
       id_prenda,
       nombre,
       descripcion,
-      color_principal,
       fecha_alta,
       categorias (
         nombre
@@ -299,38 +333,24 @@ export async function crearPrendaEnSupabase(
     };
   }
 
-  const { data: categoria, error: errorCategoria } = await supabase
-    .from('categorias')
-    .select('id_categoria')
-    .eq('nombre', entrada.categoria)
-    .limit(1)
-    .maybeSingle();
+  const categoria = await obtenerCategoriaPorNombre(entrada.categoria);
 
-  if (errorCategoria) {
+  if (categoria.error || !categoria.idCategoria) {
     return {
       prenda: null,
-      error: `Error al consultar la categoría: ${errorCategoria.message}`,
-    };
-  }
-
-  if (!categoria) {
-    return {
-      prenda: null,
-      error: `No se ha encontrado la categoría "${entrada.categoria}" en Supabase.`,
+      error: categoria.error,
     };
   }
 
   const usuarioMvp = usuario as UsuarioMvpFila;
-  const categoriaSeleccionada = categoria as CategoriaFila;
 
   const { data: prendaInsertada, error: errorInsert } = await supabase
     .from('prendas')
     .insert({
       id_usuario: usuarioMvp.id_usuario,
-      id_categoria: categoriaSeleccionada.id_categoria,
+      id_categoria: categoria.idCategoria,
       nombre: entrada.nombre.trim(),
       descripcion: entrada.notas.trim(),
-      color_principal: entrada.color.trim(),
       temporada: null,
     })
     .select(
@@ -338,7 +358,6 @@ export async function crearPrendaEnSupabase(
       id_prenda,
       nombre,
       descripcion,
-      color_principal,
       fecha_alta,
       categorias (
         nombre
@@ -398,6 +417,85 @@ export async function crearPrendaEnSupabase(
 
   return {
     prenda: prendaFinal,
+    error: null,
+  };
+}
+
+export async function actualizarPrendaEnSupabase(
+  idPrenda: string,
+  entrada: NuevaPrendaEntrada
+): Promise<{
+  prenda: Prenda | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      prenda: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const mensajeError = validarNuevaPrenda(entrada);
+
+  if (mensajeError) {
+    return {
+      prenda: null,
+      error: mensajeError,
+    };
+  }
+
+  const categoria = await obtenerCategoriaPorNombre(entrada.categoria);
+
+  if (categoria.error || !categoria.idCategoria) {
+    return {
+      prenda: null,
+      error: categoria.error,
+    };
+  }
+
+  const { data: prendaActualizada, error } = await supabase
+    .from('prendas')
+    .update({
+      id_categoria: categoria.idCategoria,
+      nombre: entrada.nombre.trim(),
+      descripcion: entrada.notas.trim(),
+    })
+    .eq('id_prenda', idPrenda)
+    .select(
+      `
+      id_prenda,
+      nombre,
+      descripcion,
+      fecha_alta,
+      categorias (
+        nombre
+      ),
+      imagenes_prenda (
+        ruta_storage,
+        es_principal
+      )
+    `
+    )
+    .single();
+
+  if (error) {
+    return {
+      prenda: null,
+      error: `No se ha podido actualizar la prenda: ${error.message}`,
+    };
+  }
+
+  if (!prendaActualizada) {
+    return {
+      prenda: null,
+      error: 'Supabase no ha devuelto la prenda actualizada.',
+    };
+  }
+
+  return {
+    prenda: mapearPrendaDesdeSupabase(
+      prendaActualizada as unknown as PrendaFilaSupabase
+    ),
     error: null,
   };
 }

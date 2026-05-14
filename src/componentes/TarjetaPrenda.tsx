@@ -9,7 +9,6 @@ interface PropiedadesTarjetaPrenda {
 
 export function TarjetaPrenda({ prenda }: PropiedadesTarjetaPrenda) {
   const tieneImagen = Boolean(prenda.imagenUrl);
-  const tieneColor = prenda.color.trim().length > 0;
   const tieneNotas = prenda.notas.trim().length > 0;
 
   const etiquetaCategoria = ETIQUETAS_CATEGORIA[prenda.categoria] ?? 'Otro';
@@ -34,8 +33,6 @@ export function TarjetaPrenda({ prenda }: PropiedadesTarjetaPrenda) {
           <Text style={estilos.textoEtiqueta}>{etiquetaCategoria}</Text>
         </View>
       </View>
-
-      {tieneColor && <Text style={estilos.detalle}>Color: {prenda.color}</Text>}
 
       {tieneNotas && <Text style={estilos.detalle}>Notas: {prenda.notas}</Text>}
     </Tarjeta>

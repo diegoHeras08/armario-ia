@@ -183,6 +183,19 @@ export default function App() {
     setErrorCargaPrendas(null);
   }
 
+  // Actualiza una prenda ya existente en el estado local.
+  // La actualizacion real ya se ha hecho en Supabase desde ArmarioPantalla.
+  function actualizarPrendaEnEstado(prendaActualizada: Prenda) {
+    setPrendas((prev) =>
+      prev.map((prenda) =>
+        prenda.id === prendaActualizada.id ? prendaActualizada : prenda
+      )
+    );
+
+    setOrigenPrendas('supabase');
+    setErrorCargaPrendas(null);
+  }
+
   // Añade un resultado try-on al historial local tras crear la sesión en Supabase.
   function anadirResultadoTryOn(resultado: ResultadoTryOn) {
     setHistorial((prev) => [resultado, ...prev]);
@@ -201,7 +214,13 @@ export default function App() {
         );
 
       case 'armario':
-        return <ArmarioPantalla prendas={prendas} navegarA={navegarA} />;
+        return (
+          <ArmarioPantalla
+            prendas={prendas}
+            navegarA={navegarA}
+            onPrendaActualizada={actualizarPrendaEnEstado}
+          />
+        );
 
       case 'altaPrenda':
         return (

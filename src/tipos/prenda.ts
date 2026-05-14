@@ -50,7 +50,6 @@ export interface Prenda {
   id: string;
   nombre: string;
   categoria: CategoriaPrenda;
-  color: string;
   notas: string;
   imagenUrl?: string;
   fechaCreacion: string;
@@ -60,6 +59,5 @@ export interface Prenda {
 export interface NuevaPrendaEntrada {
   nombre: string;
   categoria: CategoriaPrenda;
-  color: string;
   notas: string;
 }

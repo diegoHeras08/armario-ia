@@ -37,7 +37,6 @@ export function AltaPrendaPantalla({
 }: PropiedadesAltaPrenda) {
   const [nombre, setNombre] = useState('');
   const [categoria, setCategoria] = useState<CategoriaPrenda>('camiseta');
-  const [color, setColor] = useState('');
   const [notas, setNotas] = useState('');
 
   const [imagenUri, setImagenUri] = useState<string | null>(null);
@@ -94,7 +93,6 @@ export function AltaPrendaPantalla({
 
   function limpiarFormulario() {
     setNombre('');
-    setColor('');
     setNotas('');
     setCategoria('camiseta');
     setImagenUri(null);
@@ -108,7 +106,7 @@ export function AltaPrendaPantalla({
       return;
     }
 
-    const entrada: NuevaPrendaEntrada = { nombre, categoria, color, notas };
+    const entrada: NuevaPrendaEntrada = { nombre, categoria, notas };
 
     const mensajeError = validarNuevaPrenda(entrada);
 
@@ -222,15 +220,6 @@ export function AltaPrendaPantalla({
             </Pressable>
           ))}
         </View>
-
-        <Text style={estilos.etiqueta}>Color</Text>
-        <TextInput
-          style={estilos.input}
-          value={color}
-          onChangeText={setColor}
-          placeholder="Ej. Azul oscuro"
-          placeholderTextColor="#9ca3af"
-        />
 
         <Text style={estilos.etiqueta}>Notas</Text>
         <TextInput

@@ -350,7 +350,7 @@ export function TryOnPantalla({
                       activa && estilos.prendaCategoriaActiva,
                     ]}
                   >
-                    {ETIQUETAS_CATEGORIA[prenda.categoria]} · {prenda.color}
+                    {ETIQUETAS_CATEGORIA[prenda.categoria]}
                   </Text>
                 </View>
               </Pressable>
@@ -424,8 +424,9 @@ export function TryOnPantalla({
       <Tarjeta>
         <Text style={estilos.tituloTarjeta}>Estado actual</Text>
         <Text style={estilos.texto}>
-          El flujo mock ya crea sesiones en Supabase. El siguiente paso será
-          cargar el historial persistente desde la base de datos.
+          El flujo mock ya crea sesiones y resultados en Supabase. El siguiente
+          paso será sustituir el resultado provisional por una generación real
+          con IA.
         </Text>
         <View style={estilos.separador} />
         <BotonPrincipal
