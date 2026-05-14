@@ -1,6 +1,8 @@
+import { decode } from 'base64-arraybuffer';
 import { supabase } from '../lib/supabase';
 import { EstadoTryOn, ResultadoTryOn, SesionTryOn } from '../tipos/tryOn';
 import { mockTryOnProvider } from './proveedoresTryOn/mockTryOnProvider';
+import { proveedorRealTryOn } from './proveedoresTryOn/proveedorRealTryOn';
 
 // Servicio del flujo try-on.
 // En esta fase se implementa persistencia mock en Supabase.
@@ -128,6 +130,22 @@ function obtenerUrlPublicaImagenUsuario(
   return data.publicUrl;
 }
 
+function obtenerUrlPublicaResultadoTryOn(
+  rutaStorage: string | null
+): string | undefined {
+  if (!rutaStorage || !supabase) {
+    return undefined;
+  }
+
+  const bucket = rutaStorage.startsWith('resultados/')
+    ? 'resultados-tryon'
+    : 'imagenes-usuario';
+
+  const { data } = supabase.storage.from(bucket).getPublicUrl(rutaStorage);
+
+  return data.publicUrl;
+}
+
 function mapearResultadoTryOnDesdeSupabase(
   fila: ResultadoTryOnFilaSupabase,
   nombrePrendaFallback = 'Prenda seleccionada'
@@ -141,7 +159,7 @@ function mapearResultadoTryOnDesdeSupabase(
       sesion?.prendas,
       nombrePrendaFallback
     ),
-    resultadoImagenUrl: obtenerUrlPublicaImagenUsuario(fila.ruta_storage),
+    resultadoImagenUrl: obtenerUrlPublicaResultadoTryOn(fila.ruta_storage),
     fechaCreacion: fila.fecha_generacion,
   };
 }
@@ -385,6 +403,303 @@ export async function crearSesionTryOnMockEnSupabase(
     return {
       resultado: null,
       error: 'Supabase no ha devuelto el resultado try-on creado.',
+    };
+  }
+
+  const resultado =
+    resultadoCreado as unknown as ResultadoTryOnFilaSupabase;
+
+  return {
+    resultado: mapearResultadoTryOnDesdeSupabase(
+      resultado,
+      prendaNombreFallback
+    ),
+    error: null,
+  };
+}
+
+function obtenerExtensionResultadoDesdeMimeType(mimeType: string): string {
+  if (mimeType.includes('png')) {
+    return 'png';
+  }
+
+  if (mimeType.includes('webp')) {
+    return 'webp';
+  }
+
+  return 'jpg';
+}
+
+export async function subirResultadoTryOnGeneradoEnSupabase(
+  idSesion: string,
+  imagenBase64: string,
+  mimeType: string
+): Promise<{
+  rutaStorage: string | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      rutaStorage: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  if (!idSesion.trim()) {
+    return {
+      rutaStorage: null,
+      error: 'No se ha recibido el identificador de la sesión try-on.',
+    };
+  }
+
+  if (!imagenBase64.trim()) {
+    return {
+      rutaStorage: null,
+      error: 'No se ha recibido la imagen generada en base64.',
+    };
+  }
+
+  if (!mimeType.trim()) {
+    return {
+      rutaStorage: null,
+      error: 'No se ha recibido el tipo MIME de la imagen generada.',
+    };
+  }
+
+  const extension = obtenerExtensionResultadoDesdeMimeType(mimeType);
+  const rutaStorage = `resultados/${idSesion}-${Date.now()}.${extension}`;
+
+  const { error } = await supabase.storage
+    .from('resultados-tryon')
+    .upload(rutaStorage, decode(imagenBase64), {
+      contentType: mimeType,
+      upsert: false,
+    });
+
+  if (error) {
+    return {
+      rutaStorage: null,
+      error: `No se ha podido subir el resultado try-on: ${error.message}`,
+    };
+  }
+
+  return {
+    rutaStorage,
+    error: null,
+  };
+}
+
+async function actualizarEstadoSesionTryOn(
+  idSesion: string,
+  estado: EstadoTryOn
+): Promise<string | null> {
+  if (!supabase) {
+    return 'El cliente de Supabase no está configurado.';
+  }
+
+  const { error } = await supabase
+    .from('sesiones_tryon')
+    .update({ estado })
+    .eq('id_sesion', idSesion);
+
+  return error?.message ?? null;
+}
+
+export async function crearSesionTryOnRealEnSupabase(
+  prendaId: string,
+  prendaNombreFallback: string,
+  datosImagenPrenda: DatosImagenPrendaTryOn
+): Promise<{
+  resultado: ResultadoTryOn | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      resultado: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const usuario = await obtenerUsuarioMvp();
+
+  if (usuario.error || !usuario.idUsuario) {
+    return {
+      resultado: null,
+      error: usuario.error,
+    };
+  }
+
+  const imagenPrincipal = await obtenerImagenPrincipalUsuario(usuario.idUsuario);
+
+  if (
+    imagenPrincipal.error ||
+    !imagenPrincipal.idImagenUsuario ||
+    !imagenPrincipal.rutaStorage
+  ) {
+    return {
+      resultado: null,
+      error: imagenPrincipal.error,
+    };
+  }
+
+  const imagenBaseUrl = obtenerUrlPublicaImagenUsuario(
+    imagenPrincipal.rutaStorage
+  );
+
+  if (!imagenBaseUrl) {
+    return {
+      resultado: null,
+      error: 'No se ha podido obtener la URL pública de la imagen base.',
+    };
+  }
+
+  const { data: sesionCreada, error: errorSesion } = await supabase
+    .from('sesiones_tryon')
+    .insert({
+      id_usuario: usuario.idUsuario,
+      id_prenda: prendaId,
+      id_imagen_usuario: imagenPrincipal.idImagenUsuario,
+      estado: 'procesando',
+    })
+    .select(
+      `
+      id_sesion,
+      id_prenda,
+      fecha_sesion,
+      estado,
+      prendas (
+        nombre
+      ),
+      imagenes_usuario (
+        ruta_storage
+      )
+    `
+    )
+    .single();
+
+  if (errorSesion) {
+    return {
+      resultado: null,
+      error: `No se ha podido crear la sesión try-on real: ${errorSesion.message}`,
+    };
+  }
+
+  if (!sesionCreada) {
+    return {
+      resultado: null,
+      error: 'Supabase no ha devuelto la sesión try-on real creada.',
+    };
+  }
+
+  const sesion = sesionCreada as unknown as SesionTryOnFilaSupabase;
+
+  const resultadoGeneracion = await proveedorRealTryOn.generarResultado({
+    idPrenda: prendaId,
+    nombrePrenda: prendaNombreFallback,
+    imagenBaseUrl,
+    rutaStorageImagenBase: imagenPrincipal.rutaStorage,
+    imagenPrendaUrl: datosImagenPrenda.imagenPrendaUrl,
+    rutaStorageImagenPrenda: datosImagenPrenda.rutaStorageImagenPrenda,
+  });
+
+  if (resultadoGeneracion.estado !== 'completado') {
+    await actualizarEstadoSesionTryOn(sesion.id_sesion, 'fallido');
+
+    return {
+      resultado: null,
+      error: resultadoGeneracion.mensaje,
+    };
+  }
+
+  let rutaStorageResultado = resultadoGeneracion.rutaStorageResultado;
+
+  if (
+    !rutaStorageResultado &&
+    resultadoGeneracion.imagenBase64Resultado &&
+    resultadoGeneracion.mimeTypeResultado
+  ) {
+    const subidaResultado = await subirResultadoTryOnGeneradoEnSupabase(
+      sesion.id_sesion,
+      resultadoGeneracion.imagenBase64Resultado,
+      resultadoGeneracion.mimeTypeResultado
+    );
+
+    if (subidaResultado.error || !subidaResultado.rutaStorage) {
+      await actualizarEstadoSesionTryOn(sesion.id_sesion, 'fallido');
+
+      return {
+        resultado: null,
+        error: subidaResultado.error,
+      };
+    }
+
+    rutaStorageResultado = subidaResultado.rutaStorage;
+  }
+
+  if (!rutaStorageResultado) {
+    await actualizarEstadoSesionTryOn(sesion.id_sesion, 'fallido');
+
+    return {
+      resultado: null,
+      error:
+        'El proveedor real no ha devuelto una ruta Storage ni una imagen base64 para registrar el resultado.',
+    };
+  }
+
+  const { data: resultadoCreado, error: errorResultado } = await supabase
+    .from('resultados_tryon')
+    .insert({
+      id_sesion: sesion.id_sesion,
+      ruta_storage: rutaStorageResultado,
+    })
+    .select(
+      `
+      id_resultado,
+      id_sesion,
+      ruta_storage,
+      fecha_generacion,
+      sesiones_tryon (
+        id_sesion,
+        estado,
+        fecha_sesion,
+        prendas (
+          nombre
+        ),
+        imagenes_usuario (
+          ruta_storage
+        )
+      )
+    `
+    )
+    .single();
+
+  if (errorResultado) {
+    await actualizarEstadoSesionTryOn(sesion.id_sesion, 'fallido');
+
+    return {
+      resultado: null,
+      error: `La sesión real se creó, pero no se pudo registrar el resultado: ${errorResultado.message}`,
+    };
+  }
+
+  if (!resultadoCreado) {
+    await actualizarEstadoSesionTryOn(sesion.id_sesion, 'fallido');
+
+    return {
+      resultado: null,
+      error: 'Supabase no ha devuelto el resultado try-on real creado.',
+    };
+  }
+
+  const errorActualizarEstado = await actualizarEstadoSesionTryOn(
+    sesion.id_sesion,
+    'completado'
+  );
+
+  if (errorActualizarEstado) {
+    return {
+      resultado: null,
+      error: `El resultado se creó, pero no se pudo marcar la sesión como completada: ${errorActualizarEstado}`,
     };
   }
 

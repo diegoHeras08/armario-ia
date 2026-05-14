@@ -16,6 +16,7 @@ import { EncabezadoPantalla } from '../componentes/EncabezadoPantalla';
 import { Tarjeta } from '../componentes/Tarjeta';
 import {
   crearSesionTryOnMockEnSupabase,
+  crearSesionTryOnRealEnSupabase,
   PASOS_TRYON,
 } from '../servicios/tryOnServicio';
 import { NombrePantalla } from '../tipos/navegacion';
@@ -49,10 +50,12 @@ export function TryOnPantalla({
   >(null);
 
   const [resultadoMock, setResultadoMock] = useState<string | null>(null);
+  const [resultadoIa, setResultadoIa] = useState<string | null>(null);
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [generando, setGenerando] = useState(false);
+  const [generandoIa, setGenerandoIa] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const prendaSeleccionada =
@@ -61,6 +64,7 @@ export function TryOnPantalla({
   const hayImagenPendiente = Boolean(imagenPreviewUri);
   const hayImagenBaseGuardada = Boolean(imagenBaseUrl);
   const hayPrendaSeleccionada = Boolean(prendaSeleccionada);
+  const generacionEnCurso = generando || generandoIa;
 
   useEffect(() => {
     let activo = true;
@@ -122,6 +126,7 @@ export function TryOnPantalla({
     setImagenBase64(asset.base64);
     setImagenMimeType(asset.mimeType ?? 'image/jpeg');
     setResultadoMock(null);
+    setResultadoIa(null);
     setError(null);
   }
 
@@ -154,6 +159,8 @@ export function TryOnPantalla({
     setImagenPreviewUri(null);
     setImagenBase64(null);
     setImagenMimeType(null);
+    setResultadoMock(null);
+    setResultadoIa(null);
 
     Alert.alert(
       'Imagen base guardada',
@@ -186,7 +193,7 @@ export function TryOnPantalla({
   }
 
   async function generarSimulacionMock() {
-    if (generando) {
+    if (generacionEnCurso) {
       return;
     }
 
@@ -205,6 +212,7 @@ export function TryOnPantalla({
     setGenerando(true);
     setError(null);
     setResultadoMock(null);
+    setResultadoIa(null);
 
     const resultado = await crearSesionTryOnMockEnSupabase(
       prendaSeleccionada.id,
@@ -218,7 +226,7 @@ export function TryOnPantalla({
     setGenerando(false);
 
     if (resultado.error || !resultado.resultado) {
-      setError(`No se pudo crear la sesión try-on: ${resultado.error}`);
+      setError(`No se pudo crear la sesión try-on mock: ${resultado.error}`);
       return;
     }
 
@@ -226,6 +234,61 @@ export function TryOnPantalla({
 
     setResultadoMock(
       `Sesión try-on mock guardada en Supabase con la prenda "${resultado.resultado.prendaNombre}".`
+    );
+  }
+
+  async function generarSimulacionIa() {
+    if (generacionEnCurso) {
+      return;
+    }
+
+    if (!imagenBaseUrl) {
+      setError(
+        'Primero guarda una imagen base real del modelo. La imagen guía solo sirve como referencia.'
+      );
+      return;
+    }
+
+    if (!prendaSeleccionada) {
+      setError('Selecciona una prenda del armario antes de generar el try-on.');
+      return;
+    }
+
+    if (
+      !prendaSeleccionada.imagenUrl ||
+      !prendaSeleccionada.rutaStorageImagen
+    ) {
+      setError(
+        'Para usar IA real, la prenda seleccionada debe tener una imagen guardada en Supabase.'
+      );
+      return;
+    }
+
+    setGenerandoIa(true);
+    setError(null);
+    setResultadoMock(null);
+    setResultadoIa(null);
+
+    const resultado = await crearSesionTryOnRealEnSupabase(
+      prendaSeleccionada.id,
+      prendaSeleccionada.nombre,
+      {
+        imagenPrendaUrl: prendaSeleccionada.imagenUrl,
+        rutaStorageImagenPrenda: prendaSeleccionada.rutaStorageImagen,
+      }
+    );
+
+    setGenerandoIa(false);
+
+    if (resultado.error || !resultado.resultado) {
+      setError(`No se pudo generar el try-on con IA: ${resultado.error}`);
+      return;
+    }
+
+    onResultadoCreado(resultado.resultado);
+
+    setResultadoIa(
+      `Try-on con IA generado y guardado en Supabase con la prenda "${resultado.resultado.prendaNombre}".`
     );
   }
 
@@ -386,6 +449,7 @@ export function TryOnPantalla({
                 onPress={() => {
                   setPrendaSeleccionadaId(prenda.id);
                   setResultadoMock(null);
+                  setResultadoIa(null);
                   setError(null);
                 }}
                 style={[
@@ -442,22 +506,28 @@ export function TryOnPantalla({
       <Tarjeta>
         <View style={estilos.encabezadoTarjeta}>
           <View>
-            <Text style={estilos.tituloTarjeta}>Simulación provisional</Text>
+            <Text style={estilos.tituloTarjeta}>Simulación try-on</Text>
             <Text style={estilos.textoSecundario}>
-              Flujo mock para validar sesiones e historial.
+              Flujo mock como respaldo y generación real con IA.
             </Text>
           </View>
 
           <View style={[estilos.estadoMini, estilos.estadoMiniPendiente]}>
-            <Text style={[estilos.textoEstadoMini, estilos.textoEstadoMiniPendiente]}>
-              Mock
+            <Text
+              style={[
+                estilos.textoEstadoMini,
+                estilos.textoEstadoMiniPendiente,
+              ]}
+            >
+              Mock / IA
             </Text>
           </View>
         </View>
 
         <Text style={estilos.texto}>
-          Todavía no se llama a un modelo de IA real. Esta acción crea una
-          sesión try-on provisional en Supabase usando la imagen base guardada.
+          Puedes usar el mock para validar el flujo o generar una imagen real
+          con IA usando Nano Banana. Mantén el mock como respaldo para la
+          presentación.
         </Text>
 
         <View style={estilos.resumenFlujo}>
@@ -471,17 +541,26 @@ export function TryOnPantalla({
           />
           <FilaEstado
             texto="Resultado real con IA"
-            completado={false}
-            pendiente
+            completado={Boolean(resultadoIa)}
+            pendiente={!resultadoIa}
           />
         </View>
 
         <View style={estilos.separador} />
 
         <BotonPrincipal
-          texto={generando ? 'Guardando sesión...' : 'Generar try-on mock'}
+          texto={generando ? 'Guardando sesión mock...' : 'Generar try-on mock'}
           onPress={generarSimulacionMock}
-          deshabilitado={generando}
+          deshabilitado={generacionEnCurso}
+        />
+
+        <View style={estilos.separador} />
+
+        <BotonPrincipal
+          texto={generandoIa ? 'Generando con IA...' : 'Generar try-on con IA'}
+          variante="secundario"
+          onPress={generarSimulacionIa}
+          deshabilitado={generacionEnCurso}
         />
 
         {resultadoMock && (
@@ -489,8 +568,26 @@ export function TryOnPantalla({
             <Text style={estilos.resultadoTitulo}>Resultado provisional</Text>
             <Text style={estilos.texto}>{resultadoMock}</Text>
             <Text style={estilos.textoSecundario}>
-              El resultado se ha añadido al historial. En la siguiente fase se
-              sustituirá por una imagen generada con IA real.
+              El resultado mock se ha añadido al historial.
+            </Text>
+
+            <View style={estilos.separador} />
+
+            <BotonPrincipal
+              texto="Ver historial"
+              variante="secundario"
+              onPress={() => navegarA('historial')}
+            />
+          </View>
+        )}
+
+        {resultadoIa && (
+          <View style={estilos.resultadoMock}>
+            <Text style={estilos.resultadoTitulo}>Resultado IA</Text>
+            <Text style={estilos.texto}>{resultadoIa}</Text>
+            <Text style={estilos.textoSecundario}>
+              El resultado generado se ha guardado en Supabase y aparecerá en el
+              historial.
             </Text>
 
             <View style={estilos.separador} />
@@ -538,8 +635,8 @@ export function TryOnPantalla({
         <View style={estilos.separador} />
 
         <Text style={estilos.textoSecundario}>
-          Estado actual: el flujo mock crea sesiones en Supabase. Queda
-          pendiente sustituirlo por generación real con IA.
+          Estado actual: el flujo mock funciona como respaldo y el proveedor IA
+          ya está conectado como flujo separado.
         </Text>
 
         <View style={estilos.separador} />
@@ -560,7 +657,11 @@ interface PropiedadesFilaEstado {
   pendiente?: boolean;
 }
 
-function FilaEstado({ texto, completado, pendiente = false }: PropiedadesFilaEstado) {
+function FilaEstado({
+  texto,
+  completado,
+  pendiente = false,
+}: PropiedadesFilaEstado) {
   return (
     <View style={estilos.filaEstado}>
       <View

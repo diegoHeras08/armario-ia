@@ -34,8 +34,17 @@ export interface ResultadoGeneracionTryOn {
 
   // Ruta interna del resultado generado en Supabase Storage.
   // En modo mock reutiliza la imagen base.
-  // En modo real apuntará al bucket resultados-tryon.
+  // En modo real se rellenara despues de subir la imagen generada.
   rutaStorageResultado?: string;
+
+  // Imagen generada devuelta por el proveedor IA.
+  // En modo mock no se usa.
+  // En modo real puede venir desde Gemini/Nano Banana como base64.
+  imagenBase64Resultado?: string;
+
+  // Tipo MIME de la imagen generada.
+  // Ejemplo: image/png, image/jpeg, image/webp.
+  mimeTypeResultado?: string;
 
   mensaje: string;
 }
