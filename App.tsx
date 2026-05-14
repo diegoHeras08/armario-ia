@@ -196,6 +196,13 @@ export default function App() {
     setErrorCargaPrendas(null);
   }
 
+  // Quita una prenda del estado local tras marcarla como eliminada en Supabase.
+  function eliminarPrendaEnEstado(idPrenda: string) {
+    setPrendas((prev) => prev.filter((prenda) => prenda.id !== idPrenda));
+    setOrigenPrendas('supabase');
+    setErrorCargaPrendas(null);
+  }
+
   // Añade un resultado try-on al historial local tras crear la sesión en Supabase.
   function anadirResultadoTryOn(resultado: ResultadoTryOn) {
     setHistorial((prev) => [resultado, ...prev]);
@@ -219,6 +226,7 @@ export default function App() {
             prendas={prendas}
             navegarA={navegarA}
             onPrendaActualizada={actualizarPrendaEnEstado}
+            onPrendaEliminada={eliminarPrendaEnEstado}
           />
         );
 

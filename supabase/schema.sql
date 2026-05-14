@@ -54,6 +54,7 @@ create table if not exists prendas (
   descripcion text,
   color_principal text,
   temporada text,
+  eliminada boolean not null default false,
   fecha_alta timestamptz not null default now()
 );
 

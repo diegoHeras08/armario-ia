@@ -9,6 +9,8 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import * as ImagePicker from 'expo-image-picker';
+
 import { BotonPrincipal } from '../componentes/BotonPrincipal';
 import { EncabezadoPantalla } from '../componentes/EncabezadoPantalla';
 import { TarjetaPrenda } from '../componentes/TarjetaPrenda';
@@ -21,7 +23,9 @@ import {
 } from '../tipos/prenda';
 import { NombrePantalla } from '../tipos/navegacion';
 import {
+  actualizarImagenPrincipalPrendaEnSupabase,
   actualizarPrendaEnSupabase,
+  eliminarPrendaEnSupabase,
   validarNuevaPrenda,
 } from '../servicios/prendaServicio';
 
@@ -29,6 +33,7 @@ interface PropiedadesArmario {
   prendas: Prenda[];
   navegarA: (pantalla: NombrePantalla) => void;
   onPrendaActualizada?: (prenda: Prenda) => void;
+  onPrendaEliminada?: (idPrenda: string) => void;
 }
 
 type FiltroCategoria = CategoriaPrenda | 'todas';
@@ -37,6 +42,7 @@ export function ArmarioPantalla({
   prendas,
   navegarA,
   onPrendaActualizada,
+  onPrendaEliminada,
 }: PropiedadesArmario) {
   const [filtro, setFiltro] = useState<FiltroCategoria>('todas');
   const [prendaSeleccionada, setPrendaSeleccionada] =
@@ -50,6 +56,12 @@ export function ArmarioPantalla({
   const [errorEdicion, setErrorEdicion] = useState<string | null>(null);
   const [guardandoEdicion, setGuardandoEdicion] = useState(false);
 
+  const [cambiandoImagen, setCambiandoImagen] = useState(false);
+  const [errorImagen, setErrorImagen] = useState<string | null>(null);
+
+  const [eliminando, setEliminando] = useState(false);
+  const [errorEliminacion, setErrorEliminacion] = useState<string | null>(null);
+
   const prendasFiltradas = useMemo(() => {
     if (filtro === 'todas') return prendas;
     return prendas.filter((p) => p.categoria === filtro);
@@ -59,12 +71,16 @@ export function ArmarioPantalla({
     setPrendaSeleccionada(prenda);
     setModoEdicion(false);
     setErrorEdicion(null);
+    setErrorImagen(null);
+    setErrorEliminacion(null);
   }
 
   function cerrarDetalle() {
     setPrendaSeleccionada(null);
     setModoEdicion(false);
     setErrorEdicion(null);
+    setErrorImagen(null);
+    setErrorEliminacion(null);
   }
 
   function iniciarEdicion() {
@@ -125,6 +141,113 @@ export function ArmarioPantalla({
       'Prenda actualizada',
       `"${resultado.prenda.nombre}" se ha actualizado correctamente.`
     );
+  }
+
+  async function cambiarFotoPrenda() {
+    if (!prendaSeleccionada || cambiandoImagen) {
+      return;
+    }
+
+    const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
+
+    if (!permiso.granted) {
+      setErrorImagen('Necesitas conceder permiso para acceder a la galería.');
+      return;
+    }
+
+    const resultado = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      quality: 0.8,
+      aspect: [4, 5],
+      base64: true,
+    });
+
+    if (resultado.canceled) {
+      return;
+    }
+
+    const asset = resultado.assets[0];
+
+    if (!asset?.uri || !asset.base64) {
+      setErrorImagen('No se ha podido preparar la nueva imagen.');
+      return;
+    }
+
+    setCambiandoImagen(true);
+    setErrorImagen(null);
+
+    const resultadoActualizacion =
+      await actualizarImagenPrincipalPrendaEnSupabase(prendaSeleccionada.id, {
+        base64: asset.base64,
+        mimeType: asset.mimeType ?? 'image/jpeg',
+      });
+
+    setCambiandoImagen(false);
+
+    if (resultadoActualizacion.error || !resultadoActualizacion.prenda) {
+      setErrorImagen(
+        `No se pudo cambiar la foto: ${resultadoActualizacion.error}`
+      );
+      return;
+    }
+
+    setPrendaSeleccionada(resultadoActualizacion.prenda);
+    onPrendaActualizada?.(resultadoActualizacion.prenda);
+
+    Alert.alert(
+      'Foto actualizada',
+      `La imagen de "${resultadoActualizacion.prenda.nombre}" se ha actualizado correctamente.`
+    );
+  }
+
+  function confirmarEliminacion() {
+    if (!prendaSeleccionada || eliminando) {
+      return;
+    }
+
+    Alert.alert(
+      'Eliminar prenda',
+      `¿Seguro que quieres eliminar "${prendaSeleccionada.nombre}" del armario?`,
+      [
+        {
+          text: 'Cancelar',
+          style: 'cancel',
+        },
+        {
+          text: 'Eliminar',
+          style: 'destructive',
+          onPress: eliminarPrendaSeleccionada,
+        },
+      ]
+    );
+  }
+
+  async function eliminarPrendaSeleccionada() {
+    if (!prendaSeleccionada || eliminando) {
+      return;
+    }
+
+    setEliminando(true);
+    setErrorEliminacion(null);
+
+    const resultado = await eliminarPrendaEnSupabase(prendaSeleccionada.id);
+
+    setEliminando(false);
+
+    if (resultado.error || !resultado.idPrenda) {
+      setErrorEliminacion(`No se pudo eliminar la prenda: ${resultado.error}`);
+      return;
+    }
+
+    onPrendaEliminada?.(resultado.idPrenda);
+
+    Alert.alert(
+      'Prenda eliminada',
+      `"${prendaSeleccionada.nombre}" se ha eliminado del armario.`
+    );
+
+    cerrarDetalle();
   }
 
   if (prendaSeleccionada) {
@@ -244,11 +367,32 @@ export function ArmarioPantalla({
                 </Text>
               </View>
 
+              {errorImagen && <Text style={estilos.error}>{errorImagen}</Text>}
+              {errorEliminacion && (
+                <Text style={estilos.error}>{errorEliminacion}</Text>
+              )}
+
               <View style={estilos.separador} />
 
               <BotonPrincipal
                 texto="Editar prenda"
                 onPress={iniciarEdicion}
+              />
+
+              <View style={estilos.separador} />
+
+              <BotonPrincipal
+                texto={cambiandoImagen ? 'Cambiando foto...' : 'Cambiar foto'}
+                variante="secundario"
+                onPress={cambiarFotoPrenda}
+              />
+
+              <View style={estilos.separador} />
+
+              <BotonPrincipal
+                texto={eliminando ? 'Eliminando...' : 'Eliminar prenda'}
+                variante="secundario"
+                onPress={confirmarEliminacion}
               />
 
               <View style={estilos.separador} />

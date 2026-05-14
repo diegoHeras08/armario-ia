@@ -6,7 +6,7 @@ import {
   Prenda,
 } from '../tipos/prenda';
 
-type ImagenPrendaEntrada = {
+export type ImagenPrendaEntrada = {
   base64: string;
   mimeType: string;
 };
@@ -52,6 +52,7 @@ type PrendaFilaSupabase = {
   nombre: string;
   descripcion: string | null;
   fecha_alta: string;
+  eliminada?: boolean;
   categorias?: CategoriaRelacion;
   imagenes_prenda?: ImagenPrendaRelacion;
 };
@@ -64,8 +65,6 @@ type CategoriaFila = {
   id_categoria: string;
 };
 
-// Convierte nombres antiguos o no controlados de Supabase a categorías válidas
-// del modelo actual de la app.
 function normalizarCategoria(nombre: string | null | undefined): CategoriaPrenda {
   switch (nombre) {
     case 'camiseta':
@@ -81,7 +80,6 @@ function normalizarCategoria(nombre: string | null | undefined): CategoriaPrenda
     case 'otro':
       return nombre;
 
-    // Compatibilidad temporal con categorías antiguas.
     case 'superior':
       return 'camiseta';
 
@@ -189,6 +187,69 @@ async function obtenerCategoriaPorNombre(
   };
 }
 
+async function obtenerPrendaPorIdDesdeSupabase(
+  idPrenda: string
+): Promise<{
+  prenda: Prenda | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      prenda: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const { data, error } = await supabase
+    .from('prendas')
+    .select(
+      `
+      id_prenda,
+      nombre,
+      descripcion,
+      fecha_alta,
+      eliminada,
+      categorias (
+        nombre
+      ),
+      imagenes_prenda (
+        ruta_storage,
+        es_principal
+      )
+    `
+    )
+    .eq('id_prenda', idPrenda)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      prenda: null,
+      error: `No se ha podido obtener la prenda: ${error.message}`,
+    };
+  }
+
+  if (!data) {
+    return {
+      prenda: null,
+      error: 'Supabase no ha devuelto la prenda solicitada.',
+    };
+  }
+
+  const fila = data as unknown as PrendaFilaSupabase;
+
+  if (fila.eliminada) {
+    return {
+      prenda: null,
+      error: 'La prenda está marcada como eliminada.',
+    };
+  }
+
+  return {
+    prenda: mapearPrendaDesdeSupabase(fila),
+    error: null,
+  };
+}
+
 export async function obtenerPrendasDesdeSupabase(): Promise<{
   prendas: Prenda[];
   error: string | null;
@@ -208,6 +269,7 @@ export async function obtenerPrendasDesdeSupabase(): Promise<{
       nombre,
       descripcion,
       fecha_alta,
+      eliminada,
       categorias (
         nombre
       ),
@@ -217,6 +279,7 @@ export async function obtenerPrendasDesdeSupabase(): Promise<{
       )
     `
     )
+    .eq('eliminada', false)
     .order('fecha_alta', { ascending: false });
 
   if (error) {
@@ -269,6 +332,21 @@ async function subirImagenPrenda(
     rutaStorage,
     error: null,
   };
+}
+
+async function marcarImagenesPrendaComoNoPrincipales(
+  idPrenda: string
+): Promise<string | null> {
+  if (!supabase) {
+    return 'El cliente de Supabase no está configurado.';
+  }
+
+  const { error } = await supabase
+    .from('imagenes_prenda')
+    .update({ es_principal: false })
+    .eq('id_prenda', idPrenda);
+
+  return error?.message ?? null;
 }
 
 async function registrarImagenPrenda(
@@ -352,6 +430,7 @@ export async function crearPrendaEnSupabase(
       nombre: entrada.nombre.trim(),
       descripcion: entrada.notas.trim(),
       temporada: null,
+      eliminada: false,
     })
     .select(
       `
@@ -359,6 +438,7 @@ export async function crearPrendaEnSupabase(
       nombre,
       descripcion,
       fecha_alta,
+      eliminada,
       categorias (
         nombre
       )
@@ -461,12 +541,14 @@ export async function actualizarPrendaEnSupabase(
       descripcion: entrada.notas.trim(),
     })
     .eq('id_prenda', idPrenda)
+    .eq('eliminada', false)
     .select(
       `
       id_prenda,
       nombre,
       descripcion,
       fecha_alta,
+      eliminada,
       categorias (
         nombre
       ),
@@ -496,6 +578,86 @@ export async function actualizarPrendaEnSupabase(
     prenda: mapearPrendaDesdeSupabase(
       prendaActualizada as unknown as PrendaFilaSupabase
     ),
+    error: null,
+  };
+}
+
+export async function actualizarImagenPrincipalPrendaEnSupabase(
+  idPrenda: string,
+  imagen: ImagenPrendaEntrada
+): Promise<{
+  prenda: Prenda | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      prenda: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const subida = await subirImagenPrenda(idPrenda, imagen);
+
+  if (subida.error || !subida.rutaStorage) {
+    return {
+      prenda: null,
+      error: `No se ha podido subir la nueva imagen: ${subida.error}`,
+    };
+  }
+
+  const errorDesactivarImagenes =
+    await marcarImagenesPrendaComoNoPrincipales(idPrenda);
+
+  if (errorDesactivarImagenes) {
+    return {
+      prenda: null,
+      error: `La imagen se subió, pero no se pudo actualizar la imagen principal anterior: ${errorDesactivarImagenes}`,
+    };
+  }
+
+  const errorRegistroImagen = await registrarImagenPrenda(
+    idPrenda,
+    subida.rutaStorage
+  );
+
+  if (errorRegistroImagen) {
+    return {
+      prenda: null,
+      error: `La imagen se subió, pero no se registró como principal: ${errorRegistroImagen}`,
+    };
+  }
+
+  return obtenerPrendaPorIdDesdeSupabase(idPrenda);
+}
+
+export async function eliminarPrendaEnSupabase(
+  idPrenda: string
+): Promise<{
+  idPrenda: string | null;
+  error: string | null;
+}> {
+  if (!supabase) {
+    return {
+      idPrenda: null,
+      error: 'El cliente de Supabase no está configurado.',
+    };
+  }
+
+  const { error } = await supabase
+    .from('prendas')
+    .update({ eliminada: true })
+    .eq('id_prenda', idPrenda)
+    .eq('eliminada', false);
+
+  if (error) {
+    return {
+      idPrenda: null,
+      error: `No se ha podido eliminar la prenda: ${error.message}`,
+    };
+  }
+
+  return {
+    idPrenda,
     error: null,
   };
 }
