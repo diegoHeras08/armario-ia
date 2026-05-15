@@ -28,6 +28,7 @@ import {
 } from '../servicios/imagenUsuarioServicio';
 
 const imagenGuiaModelo: ImageSourcePropType = require('../../assets/modelo-guia.png');
+const imagenDemoLocal: ImageSourcePropType = require('../../assets/demo/resultado-tryon-demo.png');
 
 interface PropiedadesTryOn {
   prendas: Prenda[];
@@ -51,6 +52,9 @@ export function TryOnPantalla({
 
   const [resultadoMock, setResultadoMock] = useState<string | null>(null);
   const [resultadoIa, setResultadoIa] = useState<string | null>(null);
+  const [resultadoDemoLocal, setResultadoDemoLocal] = useState<string | null>(
+    null
+  );
 
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -127,6 +131,7 @@ export function TryOnPantalla({
     setImagenMimeType(asset.mimeType ?? 'image/jpeg');
     setResultadoMock(null);
     setResultadoIa(null);
+    setResultadoDemoLocal(null);
     setError(null);
   }
 
@@ -161,6 +166,7 @@ export function TryOnPantalla({
     setImagenMimeType(null);
     setResultadoMock(null);
     setResultadoIa(null);
+    setResultadoDemoLocal(null);
 
     Alert.alert(
       'Imagen base guardada',
@@ -213,6 +219,7 @@ export function TryOnPantalla({
     setError(null);
     setResultadoMock(null);
     setResultadoIa(null);
+    setResultadoDemoLocal(null);
 
     const resultado = await crearSesionTryOnMockEnSupabase(
       prendaSeleccionada.id,
@@ -268,6 +275,7 @@ export function TryOnPantalla({
     setError(null);
     setResultadoMock(null);
     setResultadoIa(null);
+    setResultadoDemoLocal(null);
 
     const resultado = await crearSesionTryOnRealEnSupabase(
       prendaSeleccionada.id,
@@ -290,6 +298,39 @@ export function TryOnPantalla({
     setResultadoIa(
       `Try-on con IA generado y guardado en Supabase con la prenda "${resultado.resultado.prendaNombre}".`
     );
+  }
+
+  function generarDemoLocal() {
+    if (generacionEnCurso) {
+      return;
+    }
+
+    const imagenDemo = Image.resolveAssetSource(imagenDemoLocal);
+
+    if (!imagenDemo?.uri) {
+      setError('No se ha podido cargar la imagen demo local.');
+      return;
+    }
+
+    const fechaActual = new Date().toISOString();
+    const marcaTiempo = Date.now().toString(36);
+
+    const resultado: ResultadoTryOn = {
+      id: `demo-local-${marcaTiempo}`,
+      sesionId: `sesion-demo-local-${marcaTiempo}`,
+      prendaNombre: prendaSeleccionada?.nombre ?? 'Resultado demo local',
+      resultadoImagenUrl: imagenDemo.uri,
+      fechaCreacion: fechaActual,
+    };
+
+    onResultadoCreado(resultado);
+
+    setResultadoMock(null);
+    setResultadoIa(null);
+    setResultadoDemoLocal(
+      `Demo local generada sin conexión con la prenda "${resultado.prendaNombre}".`
+    );
+    setError(null);
   }
 
   const imagenMostrada = obtenerImagenMostrada();
@@ -450,6 +491,7 @@ export function TryOnPantalla({
                   setPrendaSeleccionadaId(prenda.id);
                   setResultadoMock(null);
                   setResultadoIa(null);
+                  setResultadoDemoLocal(null);
                   setError(null);
                 }}
                 style={[
@@ -508,7 +550,7 @@ export function TryOnPantalla({
           <View>
             <Text style={estilos.tituloTarjeta}>Simulación try-on</Text>
             <Text style={estilos.textoSecundario}>
-              Flujo mock como respaldo y generación real con IA.
+              Flujo mock, demo local y generación real con IA.
             </Text>
           </View>
 
@@ -519,15 +561,15 @@ export function TryOnPantalla({
                 estilos.textoEstadoMiniPendiente,
               ]}
             >
-              Mock / IA
+              Mock / Demo / IA
             </Text>
           </View>
         </View>
 
         <Text style={estilos.texto}>
-          Puedes usar el mock para validar el flujo o generar una imagen real
-          con IA usando Nano Banana. Mantén el mock como respaldo para la
-          presentación.
+          Puedes usar el mock para validar Supabase, la demo local para
+          presentación sin red, o generar una imagen real con IA usando Nano
+          Banana.
         </Text>
 
         <View style={estilos.resumenFlujo}>
@@ -538,6 +580,11 @@ export function TryOnPantalla({
           <FilaEstado
             texto="Prenda seleccionada"
             completado={hayPrendaSeleccionada}
+          />
+          <FilaEstado
+            texto="Demo local sin red"
+            completado={Boolean(resultadoDemoLocal)}
+            pendiente={!resultadoDemoLocal}
           />
           <FilaEstado
             texto="Resultado real con IA"
@@ -557,6 +604,15 @@ export function TryOnPantalla({
         <View style={estilos.separador} />
 
         <BotonPrincipal
+          texto="Generar demo local sin red"
+          variante="secundario"
+          onPress={generarDemoLocal}
+          deshabilitado={generacionEnCurso}
+        />
+
+        <View style={estilos.separador} />
+
+        <BotonPrincipal
           texto={generandoIa ? 'Generando con IA...' : 'Generar try-on con IA'}
           variante="secundario"
           onPress={generarSimulacionIa}
@@ -569,6 +625,26 @@ export function TryOnPantalla({
             <Text style={estilos.texto}>{resultadoMock}</Text>
             <Text style={estilos.textoSecundario}>
               El resultado mock se ha añadido al historial.
+            </Text>
+
+            <View style={estilos.separador} />
+
+            <BotonPrincipal
+              texto="Ver historial"
+              variante="secundario"
+              onPress={() => navegarA('historial')}
+            />
+          </View>
+        )}
+
+        {resultadoDemoLocal && (
+          <View style={estilos.resultadoMock}>
+            <Text style={estilos.resultadoTitulo}>Resultado demo local</Text>
+            <Text style={estilos.texto}>{resultadoDemoLocal}</Text>
+            <Text style={estilos.textoSecundario}>
+              Este resultado no usa Supabase, Gemini ni conexión de red. Sirve
+              como respaldo para enseñar el funcionamiento visual de la app
+              durante la presentación.
             </Text>
 
             <View style={estilos.separador} />
@@ -635,8 +711,9 @@ export function TryOnPantalla({
         <View style={estilos.separador} />
 
         <Text style={estilos.textoSecundario}>
-          Estado actual: el flujo mock funciona como respaldo y el proveedor IA
-          ya está conectado como flujo separado.
+          Estado actual: el flujo mock funciona como respaldo, la demo local
+          permite presentar sin conexión y el proveedor IA ya está conectado
+          como flujo separado.
         </Text>
 
         <View style={estilos.separador} />

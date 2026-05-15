@@ -74,6 +74,9 @@ function AplicacionContenido() {
     null
   );
 
+  const [modoAltoContraste, setModoAltoContraste] = useState(false);
+  const [modoPresentacion, setModoPresentacion] = useState(false);
+
   const estadoSupabase = useMemo(() => obtenerEstadoSupabase(), []);
   const cargandoDatosIniciales = cargandoPrendas || cargandoHistorial;
 
@@ -82,11 +85,10 @@ function AplicacionContenido() {
       ? Math.max(insets.top, StatusBar.currentHeight ?? 0)
       : insets.top;
 
-  // Margen inferior reforzado para Android con barra de navegación de 3 botones.
-  // En algunos dispositivos insets.bottom devuelve 0 aunque la barra del sistema
-  // esté encima de la app.
   const paddingInferiorBarra =
-    Platform.OS === 'android' ? Math.max(insets.bottom, 72) : Math.max(insets.bottom, 18);
+    Platform.OS === 'android'
+      ? Math.max(insets.bottom, 72)
+      : Math.max(insets.bottom, 18);
 
   useEffect(() => {
     let componenteActivo = true;
@@ -205,6 +207,14 @@ function AplicacionContenido() {
     setErrorCargaHistorial(null);
   }
 
+  function alternarModoAltoContraste() {
+    setModoAltoContraste((valor) => !valor);
+  }
+
+  function alternarModoPresentacion() {
+    setModoPresentacion((valor) => !valor);
+  }
+
   function renderizarPantalla() {
     switch (pantallaActual) {
       case 'dashboard':
@@ -213,6 +223,10 @@ function AplicacionContenido() {
             prendas={prendas}
             estadoSupabase={estadoSupabase}
             navegarA={navegarA}
+            modoAltoContraste={modoAltoContraste}
+            modoPresentacion={modoPresentacion}
+            onAlternarModoAltoContraste={alternarModoAltoContraste}
+            onAlternarModoPresentacion={alternarModoPresentacion}
           />
         );
 
@@ -254,13 +268,33 @@ function AplicacionContenido() {
   }
 
   return (
-    <View style={[estilos.contenedor, { paddingTop: paddingSuperiorSeguro }]}>
-      <StatusBar barStyle="dark-content" />
+    <View
+      style={[
+        estilos.contenedor,
+        modoAltoContraste && estilos.contenedorOscuro,
+        { paddingTop: paddingSuperiorSeguro },
+      ]}
+    >
+      <StatusBar
+        barStyle={modoAltoContraste ? 'light-content' : 'dark-content'}
+      />
 
       <View style={estilos.contenido}>
         {cargandoDatosIniciales && (
-          <View style={estilos.avisoCarga}>
-            <Text style={estilos.textoAvisoCarga}>Sincronizando datos...</Text>
+          <View
+            style={[
+              estilos.avisoCarga,
+              modoAltoContraste && estilos.avisoCargaOscuro,
+            ]}
+          >
+            <Text
+              style={[
+                estilos.textoAvisoCarga,
+                modoAltoContraste && estilos.textoAvisoCargaOscuro,
+              ]}
+            >
+              Sincronizando datos...
+            </Text>
           </View>
         )}
 
@@ -287,6 +321,7 @@ function AplicacionContenido() {
       <View
         style={[
           estilos.barraNavegacion,
+          modoAltoContraste && estilos.barraNavegacionOscura,
           {
             paddingBottom: paddingInferiorBarra,
             minHeight: 68 + paddingInferiorBarra,
@@ -304,12 +339,19 @@ function AplicacionContenido() {
               style={[
                 estilos.botonNavegacion,
                 activo && estilos.botonNavegacionActivo,
+                modoAltoContraste &&
+                  activo &&
+                  estilos.botonNavegacionActivoOscuro,
               ]}
             >
               <Text
                 style={[
                   estilos.textoNavegacion,
                   activo && estilos.textoNavegacionActivo,
+                  modoAltoContraste && estilos.textoNavegacionOscuro,
+                  modoAltoContraste &&
+                    activo &&
+                    estilos.textoNavegacionActivoOscuro,
                 ]}
               >
                 {ETIQUETAS_NAVEGACION[pantalla]}
@@ -327,6 +369,9 @@ const estilos = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f9fafb',
   },
+  contenedorOscuro: {
+    backgroundColor: '#030712',
+  },
   contenido: {
     flex: 1,
   },
@@ -337,6 +382,10 @@ const estilos = StyleSheet.create({
     borderTopColor: '#e5e7eb',
     paddingTop: 10,
     paddingHorizontal: 6,
+  },
+  barraNavegacionOscura: {
+    backgroundColor: '#111827',
+    borderTopColor: '#374151',
   },
   botonNavegacion: {
     flex: 1,
@@ -350,14 +399,23 @@ const estilos = StyleSheet.create({
   botonNavegacionActivo: {
     backgroundColor: '#f3f4f6',
   },
+  botonNavegacionActivoOscuro: {
+    backgroundColor: '#1f2937',
+  },
   textoNavegacion: {
     fontSize: 12,
     color: '#6b7280',
     fontWeight: '600',
   },
+  textoNavegacionOscuro: {
+    color: '#9ca3af',
+  },
   textoNavegacionActivo: {
     color: '#111827',
     fontWeight: '800',
+  },
+  textoNavegacionActivoOscuro: {
+    color: '#f9fafb',
   },
   avisoCarga: {
     backgroundColor: '#f8fafc',
@@ -366,10 +424,17 @@ const estilos = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
   },
+  avisoCargaOscuro: {
+    backgroundColor: '#111827',
+    borderBottomColor: '#374151',
+  },
   textoAvisoCarga: {
     color: '#374151',
     fontSize: 13,
     fontWeight: '600',
+  },
+  textoAvisoCargaOscuro: {
+    color: '#d1d5db',
   },
   avisoError: {
     backgroundColor: '#fffbeb',

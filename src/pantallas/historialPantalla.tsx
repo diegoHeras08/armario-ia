@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  Alert,
   Image,
   Modal,
   Pressable,
@@ -8,6 +9,8 @@ import {
   Text,
   View,
 } from 'react-native';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BotonPrincipal } from '../componentes/BotonPrincipal';
@@ -30,8 +33,58 @@ export function HistorialPantalla({
   const [resultadoSeleccionado, setResultadoSeleccionado] =
     useState<ResultadoTryOn | null>(null);
 
+  const [guardandoId, setGuardandoId] = useState<string | null>(null);
+
   function cerrarVisor() {
     setResultadoSeleccionado(null);
+  }
+
+  async function guardarImagenResultado(resultado: ResultadoTryOn) {
+    if (!resultado.resultadoImagenUrl) {
+      Alert.alert(
+        'Imagen no disponible',
+        'Este resultado no tiene una imagen asociada.'
+      );
+      return;
+    }
+
+    if (guardandoId) {
+      return;
+    }
+
+    setGuardandoId(resultado.id);
+
+    try {
+      const uriLocal = await prepararImagenParaCompartir(
+        resultado.resultadoImagenUrl,
+        resultado.id
+      );
+
+      const disponible = await Sharing.isAvailableAsync();
+
+      if (!disponible) {
+        Alert.alert(
+          'Compartir no disponible',
+          'Este dispositivo no permite abrir el menú de compartir.'
+        );
+        return;
+      }
+
+      await Sharing.shareAsync(uriLocal, {
+        mimeType: obtenerMimeTypeDesdeUrl(uriLocal),
+        dialogTitle: 'Guardar o compartir resultado try-on',
+        UTI: 'public.image',
+      });
+    } catch (error) {
+      Alert.alert(
+        'No se pudo abrir la imagen',
+        error instanceof Error
+          ? error.message
+          : 'Ha ocurrido un error inesperado al preparar la imagen.'
+      );
+    } finally {
+      setGuardandoId(null);
+    }
   }
 
   return (
@@ -49,8 +102,9 @@ export function HistorialPantalla({
         <Tarjeta>
           <Text style={estilos.tituloTarjeta}>Resumen del historial</Text>
           <Text style={estilos.texto}>
-            Aquí se guardan las simulaciones try-on generadas. Toca cualquier
-            resultado para abrir una vista completa de la imagen.
+            Aquí se guardan las simulaciones try-on generadas. Cada resultado
+            puede abrirse en pantalla completa y exportarse mediante el menú de
+            compartir del dispositivo.
           </Text>
 
           <View style={estilos.resumenFila}>
@@ -96,28 +150,23 @@ export function HistorialPantalla({
           </Tarjeta>
         ) : (
           resultados.map((resultado) => (
-            <Pressable
-              key={resultado.id}
-              onPress={() => setResultadoSeleccionado(resultado)}
-            >
-              <Tarjeta>
-                <View style={estilos.encabezadoResultado}>
-                  <View style={estilos.bloqueTituloResultado}>
-                    <Text style={estilos.tituloResultado} numberOfLines={2}>
-                      {resultado.prendaNombre}
-                    </Text>
-                    <Text style={estilos.fechaResultado}>
-                      {formatearFecha(resultado.fechaCreacion)}
-                    </Text>
-                  </View>
-
-                  <View style={estilos.etiquetaResultado}>
-                    <Text style={estilos.textoEtiquetaResultado}>
-                      Guardado
-                    </Text>
-                  </View>
+            <Tarjeta key={resultado.id}>
+              <View style={estilos.encabezadoResultado}>
+                <View style={estilos.bloqueTituloResultado}>
+                  <Text style={estilos.tituloResultado} numberOfLines={2}>
+                    {resultado.prendaNombre}
+                  </Text>
+                  <Text style={estilos.fechaResultado}>
+                    {formatearFecha(resultado.fechaCreacion)}
+                  </Text>
                 </View>
 
+                <View style={estilos.etiquetaResultado}>
+                  <Text style={estilos.textoEtiquetaResultado}>Guardado</Text>
+                </View>
+              </View>
+
+              <Pressable onPress={() => setResultadoSeleccionado(resultado)}>
                 {resultado.resultadoImagenUrl ? (
                   <Image
                     source={{ uri: resultado.resultadoImagenUrl }}
@@ -129,26 +178,41 @@ export function HistorialPantalla({
                     <Text style={estilos.textoPlaceholder}>Sin imagen</Text>
                   </View>
                 )}
+              </Pressable>
 
-                <View style={estilos.bloqueInfo}>
-                  <Text style={estilos.tituloInfo}>Información de sesión</Text>
+              <View style={estilos.bloqueInfo}>
+                <Text style={estilos.tituloInfo}>Información de sesión</Text>
 
-                  <Text style={estilos.detalle} numberOfLines={1}>
-                    ID sesión: {resultado.sesionId}
-                  </Text>
+                <Text style={estilos.detalle} numberOfLines={1}>
+                  ID sesión: {resultado.sesionId}
+                </Text>
 
-                  <Text style={estilos.detalle}>
-                    Estado: resultado guardado en Supabase.
-                  </Text>
-                </View>
+                <Text style={estilos.detalle}>
+                  Estado: resultado guardado en la app.
+                </Text>
+              </View>
 
-                <View style={estilos.avisoResultado}>
-                  <Text style={estilos.textoAvisoResultado}>
-                    Toca este resultado para verlo a pantalla completa.
-                  </Text>
-                </View>
-              </Tarjeta>
-            </Pressable>
+              <View style={estilos.accionesResultado}>
+                <BotonPrincipal
+                  texto="Ver imagen completa"
+                  variante="secundario"
+                  onPress={() => setResultadoSeleccionado(resultado)}
+                />
+
+                <View style={estilos.separador} />
+
+                <BotonPrincipal
+                  texto={
+                    guardandoId === resultado.id
+                      ? 'Preparando imagen...'
+                      : 'Guardar / compartir imagen'
+                  }
+                  variante="secundario"
+                  onPress={() => guardarImagenResultado(resultado)}
+                  deshabilitado={guardandoId === resultado.id}
+                />
+              </View>
+            </Tarjeta>
           ))
         )}
       </ScrollView>
@@ -206,11 +270,73 @@ export function HistorialPantalla({
             <Text style={estilos.modalDetalle} numberOfLines={1}>
               ID sesión: {resultadoSeleccionado?.sesionId ?? '-'}
             </Text>
+
+            {resultadoSeleccionado && (
+              <Pressable
+                style={estilos.botonGuardarModal}
+                onPress={() => guardarImagenResultado(resultadoSeleccionado)}
+                disabled={guardandoId === resultadoSeleccionado.id}
+              >
+                <Text style={estilos.textoBotonGuardarModal}>
+                  {guardandoId === resultadoSeleccionado.id
+                    ? 'Preparando...'
+                    : 'Guardar / compartir imagen'}
+                </Text>
+              </Pressable>
+            )}
           </View>
         </View>
       </Modal>
     </>
   );
+}
+
+async function prepararImagenParaCompartir(
+  imagenUrl: string,
+  idResultado: string
+): Promise<string> {
+  if (imagenUrl.startsWith('file://')) {
+    return imagenUrl;
+  }
+
+  if (!FileSystem.cacheDirectory) {
+    throw new Error('No se ha podido acceder a la caché del dispositivo.');
+  }
+
+  const extension = obtenerExtensionDesdeUrl(imagenUrl);
+  const rutaDestino = `${FileSystem.cacheDirectory}tryon-${idResultado}-${Date.now()}.${extension}`;
+
+  const descarga = await FileSystem.downloadAsync(imagenUrl, rutaDestino);
+
+  return descarga.uri;
+}
+
+function obtenerExtensionDesdeUrl(url: string): string {
+  const urlLimpia = url.split('?')[0].toLowerCase();
+
+  if (urlLimpia.endsWith('.png')) {
+    return 'png';
+  }
+
+  if (urlLimpia.endsWith('.webp')) {
+    return 'webp';
+  }
+
+  return 'jpg';
+}
+
+function obtenerMimeTypeDesdeUrl(url: string): string {
+  const extension = obtenerExtensionDesdeUrl(url);
+
+  if (extension === 'png') {
+    return 'image/png';
+  }
+
+  if (extension === 'webp') {
+    return 'image/webp';
+  }
+
+  return 'image/jpeg';
 }
 
 function formatearFecha(fechaIso: string): string {
@@ -341,18 +467,8 @@ const estilos = StyleSheet.create({
     lineHeight: 18,
     marginTop: 2,
   },
-  avisoResultado: {
+  accionesResultado: {
     marginTop: 12,
-    padding: 10,
-    borderRadius: 10,
-    backgroundColor: '#f9fafb',
-    borderWidth: 1,
-    borderColor: '#e5e7eb',
-  },
-  textoAvisoResultado: {
-    fontSize: 13,
-    color: '#6b7280',
-    lineHeight: 18,
   },
   separador: {
     height: 10,
@@ -419,5 +535,17 @@ const estilos = StyleSheet.create({
   modalDetalle: {
     color: '#9ca3af',
     fontSize: 12,
+    marginBottom: 8,
+  },
+  botonGuardarModal: {
+    backgroundColor: '#ffffff',
+    borderRadius: 999,
+    paddingVertical: 11,
+    alignItems: 'center',
+  },
+  textoBotonGuardarModal: {
+    color: '#111827',
+    fontSize: 14,
+    fontWeight: '800',
   },
 });
