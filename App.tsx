@@ -1,12 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   Pressable,
-  SafeAreaView,
   StatusBar,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import {
+  SafeAreaProvider,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 
 import { DashboardPantalla } from './src/pantallas/dashboardPantalla';
 import { ArmarioPantalla } from './src/pantallas/armarioPantalla';
@@ -25,7 +29,6 @@ import { obtenerEstadoSupabase } from './src/servicios/supabaseEstadoServicio';
 import { obtenerPrendasDesdeSupabase } from './src/servicios/prendaServicio';
 import { obtenerHistorialTryOnDesdeSupabase } from './src/servicios/tryOnServicio';
 
-// Etiquetas legibles para la barra inferior de navegacion local.
 const ETIQUETAS_NAVEGACION: Record<NombrePantalla, string> = {
   dashboard: 'Inicio',
   armario: 'Armario',
@@ -43,18 +46,25 @@ const PANTALLAS_NAVEGABLES: NombrePantalla[] = [
 ];
 
 export default function App() {
+  return (
+    <SafeAreaProvider>
+      <AplicacionContenido />
+    </SafeAreaProvider>
+  );
+}
+
+function AplicacionContenido() {
+  const insets = useSafeAreaInsets();
+
   const [pantallaActual, setPantallaActual] =
     useState<NombrePantalla>('dashboard');
 
-  // Empieza con datos mock para que la app no quede vacia si Supabase falla.
   const [prendas, setPrendas] = useState<Prenda[]>(PRENDAS_MOCK);
-
-  // Empieza con historial mock como respaldo temporal.
   const [historial, setHistorial] =
     useState<ResultadoTryOn[]>(HISTORIAL_MOCK);
 
-  const [cargandoPrendas, setCargandoPrendas] = useState<boolean>(true);
-  const [cargandoHistorial, setCargandoHistorial] = useState<boolean>(true);
+  const [cargandoPrendas, setCargandoPrendas] = useState(true);
+  const [cargandoHistorial, setCargandoHistorial] = useState(true);
 
   const [errorCargaPrendas, setErrorCargaPrendas] = useState<string | null>(
     null
@@ -65,8 +75,18 @@ export default function App() {
   );
 
   const estadoSupabase = useMemo(() => obtenerEstadoSupabase(), []);
-
   const cargandoDatosIniciales = cargandoPrendas || cargandoHistorial;
+
+  const paddingSuperiorSeguro =
+    Platform.OS === 'android'
+      ? Math.max(insets.top, StatusBar.currentHeight ?? 0)
+      : insets.top;
+
+  // Margen inferior reforzado para Android con barra de navegación de 3 botones.
+  // En algunos dispositivos insets.bottom devuelve 0 aunque la barra del sistema
+  // esté encima de la app.
+  const paddingInferiorBarra =
+    Platform.OS === 'android' ? Math.max(insets.bottom, 72) : Math.max(insets.bottom, 18);
 
   useEffect(() => {
     let componenteActivo = true;
@@ -234,15 +254,13 @@ export default function App() {
   }
 
   return (
-    <SafeAreaView style={estilos.contenedor}>
+    <View style={[estilos.contenedor, { paddingTop: paddingSuperiorSeguro }]}>
       <StatusBar barStyle="dark-content" />
 
       <View style={estilos.contenido}>
         {cargandoDatosIniciales && (
           <View style={estilos.avisoCarga}>
-            <Text style={estilos.textoAvisoCarga}>
-              Sincronizando datos...
-            </Text>
+            <Text style={estilos.textoAvisoCarga}>Sincronizando datos...</Text>
           </View>
         )}
 
@@ -266,7 +284,15 @@ export default function App() {
         {renderizarPantalla()}
       </View>
 
-      <View style={estilos.barraNavegacion}>
+      <View
+        style={[
+          estilos.barraNavegacion,
+          {
+            paddingBottom: paddingInferiorBarra,
+            minHeight: 68 + paddingInferiorBarra,
+          },
+        ]}
+      >
         {PANTALLAS_NAVEGABLES.map((pantalla) => {
           const activo = pantallaActual === pantalla;
 
@@ -274,7 +300,11 @@ export default function App() {
             <Pressable
               key={pantalla}
               onPress={() => navegarA(pantalla)}
-              style={estilos.botonNavegacion}
+              hitSlop={10}
+              style={[
+                estilos.botonNavegacion,
+                activo && estilos.botonNavegacionActivo,
+              ]}
             >
               <Text
                 style={[
@@ -288,7 +318,7 @@ export default function App() {
           );
         })}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -305,22 +335,29 @@ const estilos = StyleSheet.create({
     backgroundColor: '#ffffff',
     borderTopWidth: 1,
     borderTopColor: '#e5e7eb',
-    paddingVertical: 8,
+    paddingTop: 10,
+    paddingHorizontal: 6,
   },
   botonNavegacion: {
     flex: 1,
-    paddingVertical: 8,
+    minHeight: 50,
+    paddingVertical: 10,
+    paddingHorizontal: 2,
     alignItems: 'center',
     justifyContent: 'center',
+    borderRadius: 12,
+  },
+  botonNavegacionActivo: {
+    backgroundColor: '#f3f4f6',
   },
   textoNavegacion: {
     fontSize: 12,
     color: '#6b7280',
-    fontWeight: '500',
+    fontWeight: '600',
   },
   textoNavegacionActivo: {
     color: '#111827',
-    fontWeight: '700',
+    fontWeight: '800',
   },
   avisoCarga: {
     backgroundColor: '#f8fafc',
