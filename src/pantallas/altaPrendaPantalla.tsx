@@ -46,7 +46,7 @@ export function AltaPrendaPantalla({
   const [error, setError] = useState<string | null>(null);
   const [guardando, setGuardando] = useState(false);
 
-  async function seleccionarImagen() {
+  async function seleccionarImagen(recortar: boolean) {
     const permiso = await ImagePicker.requestMediaLibraryPermissionsAsync();
 
     if (!permiso.granted) {
@@ -56,9 +56,8 @@ export function AltaPrendaPantalla({
 
     const resultado = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsEditing: recortar,
       quality: 0.8,
-      aspect: [4, 5],
       base64: true,
     });
 
@@ -158,11 +157,16 @@ export function AltaPrendaPantalla({
       <View style={estilos.tarjeta}>
         <Text style={estilos.etiqueta}>Imagen de la prenda</Text>
 
+        <Text style={estilos.textoAyudaImagen}>
+          Puedes subir la imagen completa o abrir el editor para recortarla. El
+          recorte ya no fuerza un formato 4:5.
+        </Text>
+
         {imagenUri ? (
           <Image
             source={{ uri: imagenUri }}
             style={estilos.imagenPreview}
-            resizeMode="cover"
+            resizeMode="contain"
           />
         ) : (
           <View style={estilos.placeholderImagen}>
@@ -173,9 +177,23 @@ export function AltaPrendaPantalla({
         <View style={estilos.separador} />
 
         <BotonPrincipal
-          texto={imagenUri ? 'Cambiar imagen' : 'Seleccionar imagen'}
+          texto={
+            imagenUri ? 'Cambiar imagen completa' : 'Seleccionar imagen completa'
+          }
           variante="secundario"
-          onPress={seleccionarImagen}
+          onPress={() => seleccionarImagen(false)}
+        />
+
+        <View style={estilos.separador} />
+
+        <BotonPrincipal
+          texto={
+            imagenUri
+              ? 'Cambiar y recortar imagen'
+              : 'Seleccionar y recortar imagen'
+          }
+          variante="secundario"
+          onPress={() => seleccionarImagen(true)}
         />
 
         {imagenUri && (
@@ -235,11 +253,15 @@ export function AltaPrendaPantalla({
         {error && <Text style={estilos.error}>{error}</Text>}
 
         <View style={estilos.separador} />
+
         <BotonPrincipal
           texto={guardando ? 'Guardando...' : 'Guardar prenda'}
           onPress={guardar}
+          deshabilitado={guardando}
         />
+
         <View style={estilos.separador} />
+
         <BotonPrincipal
           texto="Cancelar"
           variante="secundario"
@@ -269,9 +291,15 @@ const estilos = StyleSheet.create({
     marginBottom: 6,
     marginTop: 8,
   },
+  textoAyudaImagen: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
+    marginBottom: 10,
+  },
   imagenPreview: {
     width: '100%',
-    height: 220,
+    height: 240,
     borderRadius: 12,
     backgroundColor: '#f3f4f6',
   },

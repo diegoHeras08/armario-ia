@@ -37,6 +37,7 @@ interface PropiedadesArmario {
 }
 
 type FiltroCategoria = CategoriaPrenda | 'todas';
+type ModoVistaArmario = 'lista' | 'cuadricula';
 
 export function ArmarioPantalla({
   prendas,
@@ -45,6 +46,8 @@ export function ArmarioPantalla({
   onPrendaEliminada,
 }: PropiedadesArmario) {
   const [filtro, setFiltro] = useState<FiltroCategoria>('todas');
+  const [modoVista, setModoVista] = useState<ModoVistaArmario>('lista');
+
   const [prendaSeleccionada, setPrendaSeleccionada] =
     useState<Prenda | null>(null);
 
@@ -100,6 +103,12 @@ export function ArmarioPantalla({
     setErrorEdicion(null);
   }
 
+  function alternarModoVista() {
+    setModoVista((modoActual) =>
+      modoActual === 'lista' ? 'cuadricula' : 'lista'
+    );
+  }
+
   async function guardarEdicion() {
     if (!prendaSeleccionada || guardandoEdicion) {
       return;
@@ -143,7 +152,7 @@ export function ArmarioPantalla({
     );
   }
 
-  async function cambiarFotoPrenda() {
+  async function cambiarFotoPrenda(recortar: boolean) {
     if (!prendaSeleccionada || cambiandoImagen) {
       return;
     }
@@ -157,9 +166,8 @@ export function ArmarioPantalla({
 
     const resultado = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
+      allowsEditing: recortar,
       quality: 0.8,
-      aspect: [4, 5],
       base64: true,
     });
 
@@ -272,7 +280,7 @@ export function ArmarioPantalla({
             <Image
               source={{ uri: prendaSeleccionada.imagenUrl }}
               style={estilos.imagenDetalle}
-              resizeMode="cover"
+              resizeMode="contain"
             />
           ) : (
             <View style={estilos.placeholderDetalle}>
@@ -381,11 +389,33 @@ export function ArmarioPantalla({
                 <View style={estilos.separador} />
 
                 <BotonPrincipal
-                  texto={cambiandoImagen ? 'Cambiando foto...' : 'Cambiar foto'}
+                  texto={
+                    cambiandoImagen
+                      ? 'Cambiando foto...'
+                      : 'Cambiar foto completa'
+                  }
                   variante="secundario"
-                  onPress={cambiarFotoPrenda}
+                  onPress={() => cambiarFotoPrenda(false)}
                   deshabilitado={cambiandoImagen}
                 />
+
+                <View style={estilos.separador} />
+
+                <BotonPrincipal
+                  texto={
+                    cambiandoImagen
+                      ? 'Cambiando foto...'
+                      : 'Cambiar y recortar foto'
+                  }
+                  variante="secundario"
+                  onPress={() => cambiarFotoPrenda(true)}
+                  deshabilitado={cambiandoImagen}
+                />
+
+                <Text style={estilos.textoAyudaImagen}>
+                  La opción completa conserva el formato original. La opción de
+                  recorte abre el editor del sistema sin imponer formato 4:5.
+                </Text>
               </View>
 
               <View style={estilos.seccionAcciones}>
@@ -429,6 +459,23 @@ export function ArmarioPantalla({
         subtitulo={`${prendas.length} prendas registradas`}
       />
 
+      <View style={estilos.barraHerramientas}>
+        <View>
+          <Text style={estilos.tituloHerramienta}>Vista del armario</Text>
+          <Text style={estilos.textoHerramienta}>
+            {modoVista === 'lista'
+              ? 'Lista detallada con notas e imagen grande.'
+              : 'Cuadrícula visual para revisar más prendas de un vistazo.'}
+          </Text>
+        </View>
+
+        <Pressable onPress={alternarModoVista} style={estilos.botonVista}>
+          <Text style={estilos.textoBotonVista}>
+            {modoVista === 'lista' ? 'Cuadrícula' : 'Lista'}
+          </Text>
+        </Pressable>
+      </View>
+
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -461,12 +508,24 @@ export function ArmarioPantalla({
             onPress={() => navegarA('altaPrenda')}
           />
         </View>
-      ) : (
+      ) : modoVista === 'lista' ? (
         prendasFiltradas.map((prenda) => (
           <Pressable key={prenda.id} onPress={() => abrirDetalle(prenda)}>
-            <TarjetaPrenda prenda={prenda} />
+            <TarjetaPrenda prenda={prenda} modo="lista" />
           </Pressable>
         ))
+      ) : (
+        <View style={estilos.gridPrendas}>
+          {prendasFiltradas.map((prenda) => (
+            <Pressable
+              key={prenda.id}
+              onPress={() => abrirDetalle(prenda)}
+              style={estilos.itemGridPrenda}
+            >
+              <TarjetaPrenda prenda={prenda} modo="cuadricula" />
+            </Pressable>
+          ))}
+        </View>
       )}
     </ScrollView>
   );
@@ -496,6 +555,41 @@ const estilos = StyleSheet.create({
     padding: 16,
     paddingBottom: 32,
   },
+  barraHerramientas: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  tituloHerramienta: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#111827',
+    marginBottom: 2,
+  },
+  textoHerramienta: {
+    fontSize: 12,
+    color: '#6b7280',
+    lineHeight: 16,
+    maxWidth: 210,
+  },
+  botonVista: {
+    backgroundColor: '#111827',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    marginLeft: 10,
+  },
+  textoBotonVista: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
+  },
   filtros: {
     paddingBottom: 12,
   },
@@ -519,6 +613,15 @@ const estilos = StyleSheet.create({
   },
   chipTextoActivo: {
     color: '#ffffff',
+  },
+  gridPrendas: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginHorizontal: -5,
+  },
+  itemGridPrenda: {
+    width: '50%',
+    paddingHorizontal: 5,
   },
   estadoVacio: {
     backgroundColor: '#ffffff',
@@ -611,6 +714,12 @@ const estilos = StyleSheet.create({
     fontWeight: '700',
     color: '#111827',
     marginBottom: 8,
+  },
+  textoAyudaImagen: {
+    fontSize: 13,
+    color: '#6b7280',
+    lineHeight: 18,
+    marginTop: 10,
   },
   zonaPeligro: {
     marginTop: 24,
