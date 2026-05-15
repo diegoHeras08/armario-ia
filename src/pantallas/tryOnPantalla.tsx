@@ -28,7 +28,7 @@ import {
 } from '../servicios/imagenUsuarioServicio';
 
 const imagenGuiaModelo: ImageSourcePropType = require('../../assets/modelo-guia.png');
-const imagenDemoLocal: ImageSourcePropType = require('../../assets/demo/resultado-tryon-demo.png');
+const imagenDemoLocal: ImageSourcePropType = require('../../assets/demo/resultado-tryon-demo.jpg');
 
 interface PropiedadesTryOn {
   prendas: Prenda[];

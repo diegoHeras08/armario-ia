@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "armario-ia",
+    "name": "Armario IA",
     "slug": "armario-ia",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -16,6 +16,8 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.diegoheras.armarioia",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
@@ -25,6 +27,11 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "55c5dc2f-fff3-4054-8ffb-37011368d3b9"
+      }
     }
   }
 }
